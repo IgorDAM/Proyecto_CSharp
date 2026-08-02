@@ -1304,6 +1304,28 @@ await gestor.Prestar(1);
 
 Esto es lo que hace posible testear `GestorPrestamos` sin necesitar una base de datos de verdad — el corazón de por qué Repository + DI se usan juntos casi siempre.
 
+### Moq: la versión "de verdad" de este ejemplo
+
+El `RepositorioMock` de arriba sirve para entender el concepto, pero escribir una clase fake a mano por cada interfaz que se quiera testear no escala. En la práctica (y en este mismo proyecto, MarinaApi) se usa una **librería de mocking**, Moq, que genera el fake automáticamente y permite configurar su comportamiento por test:
+
+```csharp
+var repoMock = new Mock<ILibroRepositorio>();
+repoMock.Setup(r => r.ObtenerPorId(1))
+    .Returns(new Libro(1, "Test Book", "Test Author", 2020, false));
+
+var gestor = new GestorPrestamos(repoMock.Object);
+// gestor.ObtenerPorId(1) devuelve el libro configurado arriba,
+// sin necesitar una clase RepositorioMock escrita a mano
+```
+
+- `new Mock<ILibroRepositorio>()` genera el fake en tiempo de ejecución — equivalente a escribir `RepositorioMock`, pero sin código.
+- `.Setup(...).Returns(...)` configura la respuesta **por test**, en vez de tener una única implementación fake fija compartida por todos los tests.
+- `repoMock.Object` es el objeto fake real, el que se le pasa al constructor — igual que antes se pasaba una instancia de `RepositorioMock`.
+
+Sigue siendo el mismo patrón (interfaz + implementación de test intercambiable vía DI); Moq solo genera el fake por ti y te deja configurarlo con más precisión (`Verify` para comprobar que se llamó a un método, `Setup` distinto en cada test, etc.).
+
+> Ejemplo completo, línea a línea, con los tests reales de MarinaApi (`Mock<T>`, `Setup`, `ReturnsAsync`, `Verify`, mockear interfaz vs. clase concreta, y cuándo NO hace falta mock): ver **Cap. 8.5 "Mock Tests en profundidad"** en `MIGRACION_JAVA_A_CSHARP.md`.
+
 ---
 
 ## 6.7 Cómo se combinan estos patrones en la práctica

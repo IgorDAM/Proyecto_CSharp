@@ -1376,7 +1376,133 @@ En Java testeabas el **DAO** directamente (mockeando `Session`/`Transaction`). E
 
 Una diferencia sin equivalente directo en Java: como todos nuestros métodos son `async` con `CancellationToken`, los mocks necesitan indicar que aceptan **cualquier** token, ya que el valor exacto no importa para el test.
 
-## 8.5. Ejercicio
+## 8.5. Mock Tests en profundidad
+
+### 8.5.1. Qué es un mock y por qué se usa
+
+Un **mock** es una implementación falsa y controlada de una dependencia: en vez de que `BarcoService` hable con `IBarcoRepository` de verdad (que por debajo abre una conexión a SQL Server vía EF Core), el test le da un objeto que **finge** ser `IBarcoRepository`, pero cuyo comportamiento decide el propio test línea a línea.
+
+La razón para hacerlo es aislar la **unidad bajo test** — en `BarcoServiceTests.cs`, la unidad es `BarcoService` — de todo lo que no sea su propia lógica:
+
+- **Rápido:** no hay round-trip a una base de datos real, ni siquiera a una en memoria. Los tests de `BarcoServiceTests.cs` tardan milisegundos en total.
+- **Determinista:** el mock siempre devuelve exactamente lo que el `Setup` le dice, así que el test no depende de qué datos haya en una tabla en un momento dado.
+- **No depende de infraestructura real:** los tests pasan sin tener SQL Server corriendo, sin migraciones aplicadas, sin `docker-compose up`. Esto es lo que permite que `dotnet test` funcione en cualquier máquina (o en un pipeline de CI) sin preparar nada más.
+
+Esto es la misma motivación que ya conocías de Mockito en Java (Cap. 9): el DAO/Repositorio no se testea a través del Service, se sustituye por un doble controlado.
+
+### 8.5.2. Cómo se usa Moq en este proyecto — ejemplo real, línea a línea
+
+Todo el testing de Moq del proyecto vive en un único fichero: [`MarinaApi.Tests/BarcoServiceTests.cs`](MarinaApi.Tests/BarcoServiceTests.cs). Vamos a diseccionar el constructor y dos tests.
+
+**El constructor — crear el mock e "inyectarlo" a mano:**
+
+```csharp
+private readonly Mock<IBarcoRepository> _repositoryMock;
+private readonly BarcoService _service;
+
+public BarcoServiceTests()
+{
+    _repositoryMock = new Mock<IBarcoRepository>();
+    var loggerMock = new Mock<ILogger<BarcoService>>();
+    _service = new BarcoService(_repositoryMock.Object, loggerMock.Object);
+}
+```
+
+- `Mock<IBarcoRepository>` — Moq genera en tiempo de ejecución una clase que implementa `IBarcoRepository` (la interfaz, nunca la clase `BarcoRepository`). Ningún método hace nada todavía: sin `Setup`, cualquier llamada devuelve el valor por defecto del tipo (`null`, `0`, una `Task` vacía...).
+- `_repositoryMock.Object` — el objeto `Mock<T>` en sí **no** es un `IBarcoRepository`; `.Object` es la propiedad que expone el doble falso que sí implementa la interfaz. Es lo único que se le pasa al constructor real de `BarcoService`.
+- xUnit ejecuta el constructor de la clase de test **antes de cada `[Fact]`**, así que cada test arranca con un mock limpio — es el equivalente a `@BeforeEach` en JUnit.
+
+**`Setup` + `ReturnsAsync` — decidir qué responde el mock:**
+
+```csharp
+[Fact]
+public async Task FindByIdAsync_CuandoExiste_DevuelveDto()
+{
+    var barco = new Barco { Id = 1, Nombre = "Estrella del Mar", Tipo = "Velero", Eslora = 12 };
+    _repositoryMock.Setup(r => r.FindByIdAsync(1, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(barco);
+
+    var resultado = await _service.FindByIdAsync(1);
+
+    resultado.Nombre.Should().Be("Estrella del Mar");
+    resultado.Id.Should().Be(1);
+}
+```
+
+- `Setup(r => r.FindByIdAsync(1, It.IsAny<CancellationToken>()))` — una expresión lambda que describe **qué llamada** interceptar: "cuando alguien llame a `FindByIdAsync` con el argumento `1`". `r` representa al futuro `IBarcoRepository` mockeado.
+- `It.IsAny<CancellationToken>()` — comodín de Moq: como todos los métodos async del proyecto reciben un `CancellationToken` (ver 8.4), no queremos que el `Setup` falle solo porque el token exacto no coincide; le decimos "acepta cualquier token, no me importa su valor".
+- `.ReturnsAsync(barco)` — versión async de `.Returns(...)`, pensada para métodos que devuelven `Task<T>`. Cuando `BarcoService` haga `await _repository.FindByIdAsync(1, ct)`, recibirá exactamente ese objeto `barco`, sin tocar EF Core ni SQL Server.
+- El test nunca llama a `_repositoryMock` directamente — llama a `_service.FindByIdAsync(1)`, y es `BarcoService` quien por dentro invoca al repositorio mockeado. Eso es justo lo que se está testeando: la lógica de `BarcoService`, no el repositorio.
+
+**`Verify` — comprobar que se llamó a algo, no solo qué devolvió:**
+
+```csharp
+[Fact]
+public async Task DeleteAsync_CuandoExiste_LlamaADeleteUnaVez()
+{
+    var barco = new Barco { Id = 5, Nombre = "Corsario Negro" };
+    _repositoryMock.Setup(r => r.FindByIdAsync(5, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(barco);
+
+    await _service.DeleteAsync(5);
+
+    _repositoryMock.Verify(r => r.DeleteAsync(barco, It.IsAny<CancellationToken>()), Times.Once);
+}
+```
+
+- Aquí `DeleteAsync` en `BarcoService` no devuelve nada útil que comprobar con `Should().Be(...)` — lo único observable es que **hizo lo correcto** con su dependencia. `Verify` es para ese caso: en vez de comprobar un resultado, comprueba una interacción.
+- `Times.Once` afirma que `DeleteAsync(barco, ...)` se llamó exactamente una vez sobre el mock — ni cero (bug: no se borró nada) ni dos (bug: se borró por duplicado).
+- Hay una variante más flexible con `It.Is<T>(...)`, usada en `CreateAsync_LlamaAlRepositorioConLaEntidadCorrecta`:
+  ```csharp
+  _repositoryMock.Verify(r => r.AddAsync(
+      It.Is<Barco>(b => b.Nombre == "Rayo Azul" && b.Tipo == "Motor"),
+      It.IsAny<CancellationToken>()), Times.Once);
+  ```
+  Esto no exige un objeto `Barco` idéntico por referencia, sino cualquier `Barco` que cumpla esa condición — útil porque el objeto que `BarcoService` construye internamente no es el mismo objeto que el test tiene a mano.
+
+### 8.5.3. Mockear una interfaz vs. mockear una clase concreta
+
+En `BarcoServiceTests.cs` solo se mockean interfaces: `IBarcoRepository` e `ILogger<BarcoService>`. Nunca se mockea `BarcoRepository` (la clase concreta que implementa la interfaz y por debajo usa el `DbContext` de EF Core). Esto no es casualidad — es la práctica correcta, y hay una razón concreta:
+
+| | Mockear una **interfaz** (`IBarcoRepository`) | Mockear una **clase concreta** (`BarcoRepository`) |
+|---|---|---|
+| Qué garantiza Moq | Un doble que cumple el contrato público, sin más | Requiere que los miembros sean `virtual` (si la clase es `sealed` o los métodos no son virtuales, Moq no puede interceptarlos) |
+| Acoplamiento | El test depende solo del **contrato** (qué métodos existen), no de cómo se implementan | El test queda acoplado a detalles internos de una implementación concreta |
+| Fragilidad | Cambiar la implementación de `BarcoRepository` (p. ej. optimizar una query) no rompe ningún test | Cualquier refactor interno de la clase mockeada puede romper mocks que dependían de su forma exacta |
+| Qué demuestra el test | "`BarcoService` funciona bien con **cualquier** cosa que cumpla `IBarcoRepository`" | "`BarcoService` funciona bien con **esta implementación concreta** simulada" — mucho menos útil |
+
+En la práctica: si una dependencia ya tiene interfaz (como todos los repositorios y servicios de este proyecto, gracias al patrón Repository + DI del Cap. 6 de la guía base), mockea siempre la interfaz. Mockear una clase concreta es señal de que falta una abstracción — la solución casi nunca es "forzar el mock", sino extraer una interfaz.
+
+### 8.5.4. Cuándo NO hace falta mock
+
+No todo en el proyecto necesita un mock para testearse. `BarcoMapper` (en `MarinaApi/Mapping/BarcoMapper.cs`) es el ejemplo perfecto:
+
+```csharp
+public static BarcoDto ToDto(this Barco barco) =>
+    new(barco.Id, barco.Nombre, barco.Tipo, barco.Eslora, barco.Manga, barco.Capacidad);
+```
+
+Este método no toca una base de datos, no llama a ningún servicio externo, no tiene estado ni dependencias — solo transforma un objeto en otro. Un test para `ToDto()` no necesita ningún `Mock<T>`:
+
+```csharp
+[Fact]
+public void ToDto_MapeaTodosLosCampos()
+{
+    var barco = new Barco { Id = 1, Nombre = "Velero1", Tipo = "Velero", Eslora = 12, Manga = 5, Capacidad = 20 };
+
+    var dto = barco.ToDto();
+
+    dto.Id.Should().Be(1);
+    dto.Nombre.Should().Be("Velero1");
+    dto.Eslora.Should().Be(12);
+}
+```
+
+La regla general: **mockea solo lo que cruza un límite que no controlas dentro del test** — base de datos, servicios externos, reloj del sistema, sistema de ficheros, red. Si el código bajo test es **lógica de dominio pura** (mapeos, cálculos, validaciones que no dependen de nada externo), añadir un mock no aporta nada — solo complica el test sin aislar nada real, porque no hay nada de lo que aislarse. Esto también es señal de diseño: cuanta más lógica de negocio viva en clases así de "puras" (sin dependencias), menos mocks hacen falta en general y más fácil es testear el proyecto.
+
+---
+
+## 8.6. Ejercicio
 
 ### Solución: Testing con xUnit + Moq
 
