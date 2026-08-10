@@ -4,6 +4,7 @@
 ---
 
 <a id="indice"></a>
+<a id="índice"></a>
 
 # Índice
 
@@ -26,6 +27,7 @@
 ---
 
 <a id="introduccion"></a>
+<a id="introducción"></a>
 
 # Introducción
 
@@ -47,6 +49,7 @@ Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en Espira
 ---
 
 <a id="leccion-1-sintaxis-csharp"></a>
+<a id="lección-1-sintaxis-c-para-quién-viene-de-java"></a>
 
 # Lección 1: Sintaxis C# para quién viene de Java
 
@@ -317,6 +320,7 @@ int[] mitad = numeros[1..3]; // elementos en posiciones 1 y 2
 ---
 
 <a id="leccion-2-colecciones-y-linq"></a>
+<a id="lección-2-colecciones-y-linq"></a>
 
 # Lección 2: Colecciones y LINQ
 
@@ -515,6 +519,7 @@ Con una lista de al menos 5 libros:
 ---
 
 <a id="leccion-3-async-await-y-manejo-de-excepciones"></a>
+<a id="lección-3-asyncawait-y-manejo-de-excepciones"></a>
 
 # Lección 3: Async/Await y manejo de excepciones
 
@@ -873,6 +878,7 @@ namespace repositorio
 ---
 
 <a id="leccion-4-generics"></a>
+<a id="lección-4-generics"></a>
 
 # Lección 4: Generics
 
@@ -1023,6 +1029,7 @@ Esto es literalmente cómo está construido `Dictionary<TKey, TValue>` intername
 ---
 
 <a id="leccion-5-delegates-y-eventos"></a>
+<a id="lección-5-delegates-y-eventos"></a>
 
 # Lección 5: Delegates y Eventos
 
@@ -1153,6 +1160,7 @@ gestor.NotificacionEnviada -= ManejarNotificacion; // deja de recibir notificaci
 ---
 
 <a id="leccion-6-patrones-de-diseno"></a>
+<a id="lección-6-patrones-de-diseño"></a>
 
 # Lección 6: Patrones de Diseño
 
@@ -1375,6 +1383,7 @@ En Espiral MS verás esta combinación constantemente: interfaz + implementació
 ---
 
 <a id="leccion-7-sql-oracle-y-t-sql"></a>
+<a id="lección-7-sql-oracle-y-t-sql"></a>
 
 # Lección 7: SQL — Oracle y T-SQL
 
@@ -1630,6 +1639,7 @@ SELECT @NuevoId;
 ---
 
 <a id="leccion-8-entity-framework-core"></a>
+<a id="lección-8-entity-framework-core"></a>
 
 # Lección 8: Entity Framework Core
 
@@ -1917,6 +1927,7 @@ Fíjate que **todos** los métodos de EF Core que tocan la base de datos termina
 ---
 
 <a id="leccion-9-git-avanzado"></a>
+<a id="lección-9-git-avanzado"></a>
 
 # Lección 9: Git Avanzado
 
@@ -2137,6 +2148,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 ---
 
 <a id="leccion-10-scrum-y-agile"></a>
+<a id="lección-10-scrum-y-agile"></a>
 
 # Lección 10: Scrum y Agile
 
@@ -2327,6 +2339,7 @@ Simula un mini-sprint sobre tu proyecto de biblioteca:
 ---
 
 <a id="leccion-11-frontend"></a>
+<a id="lección-11-frontend"></a>
 
 # Lección 11: Frontend
 
@@ -2589,6 +2602,7 @@ const todosPositivos = numeros.every(n => n > 0);           // como .All()
 ---
 
 <a id="leccion-12-typescript"></a>
+<a id="lección-12-typescript"></a>
 
 # Lección 12: TypeScript
 

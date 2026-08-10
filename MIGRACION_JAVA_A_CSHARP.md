@@ -11,6 +11,7 @@
 ---
 
 <a id="indice"></a>
+<a id="índice"></a>
 
 # Índice
 
@@ -33,6 +34,7 @@
 ---
 
 <a id="introduccion-hibernate-vs-entity-framework-core"></a>
+<a id="1-introducción-hibernate-vs-entity-framework-core"></a>
 
 # 1. Introducción: Hibernate vs Entity Framework Core
 
@@ -92,6 +94,7 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 ---
 
 <a id="configuracion-del-proyecto"></a>
+<a id="2-configuración-del-proyecto"></a>
 
 # 2. Configuración del proyecto
 
@@ -266,6 +269,7 @@ BarcoRegata  ← Tabla intermedia N:M (generada automáticamente por EF Core)
 ---
 
 <a id="entidades-y-mapeo"></a>
+<a id="3-entidades-y-mapeo"></a>
 
 # 3. Entidades y Mapeo
 
@@ -509,6 +513,7 @@ public class Barco
 ---
 
 <a id="relaciones-entre-entidades"></a>
+<a id="4-relaciones-entre-entidades"></a>
 
 # 4. Relaciones entre Entidades
 
@@ -733,6 +738,7 @@ dotnet ef database update
 ---
 
 <a id="estados-y-change-tracking"></a>
+<a id="5-estados-y-change-tracking"></a>
 
 # 5. Estados y Change Tracking
 
@@ -887,6 +893,7 @@ await _context.SaveChangesAsync();  // Genera UPDATE solo
 ---
 
 <a id="repositorio-generico-vs-dao"></a>
+<a id="6-repositorio-genérico-vs-dao"></a>
 
 # 6. Repositorio Genérico (vs DAO)
 
@@ -1071,6 +1078,7 @@ public async Task<List<Barco>> FindByCapacidadGreaterThanAsync(int capacidad, Ca
 ---
 
 <a id="consultas-con-linq-vs-hql-criteria"></a>
+<a id="7-consultas-con-linq-vs-hqlcriteria"></a>
 
 # 7. Consultas con LINQ (vs HQL/Criteria)
 
@@ -1332,6 +1340,7 @@ No hay compromiso — simplemente escribes la condición en C# y EF Core la trad
 ---
 
 <a id="testing-con-xunit-y-moq-vs-junit-mockito"></a>
+<a id="8-testing-con-xunit-y-moq-vs-junitmockito"></a>
 
 # 8. Testing con xUnit y Moq (vs JUnit/Mockito)
 
@@ -1607,6 +1616,7 @@ public async Task UpdateAsync_CuandoNoExiste_LanzaNotFoundException()
 ---
 
 <a id="aspnet-core-web-api-vs-spring-boot"></a>
+<a id="9-aspnet-core-web-api-vs-spring-boot"></a>
 
 # 9. ASP.NET Core Web API (vs Spring Boot)
 
@@ -1738,6 +1748,7 @@ public class BarcosController : ControllerBase
 ---
 
 <a id="capa-de-servicio"></a>
+<a id="10-capa-de-servicio"></a>
 
 # 10. Capa de Servicio
 
@@ -1880,6 +1891,7 @@ public async Task<List<BarcoDto>> FindTop5ByCapacidadAsync(CancellationToken ct 
 ---
 
 <a id="api-rest-con-controllers"></a>
+<a id="11-api-rest-con-controllers"></a>
 
 # 11. API REST con Controllers
 
@@ -2077,6 +2089,7 @@ Invoke-WebRequest -Uri "http://localhost:5000/api/barcos/eslora/12" `
 ---
 
 <a id="dtos-y-mapper"></a>
+<a id="12-dtos-y-mapper"></a>
 
 # 12. DTOs y Mapper
 
@@ -2247,6 +2260,7 @@ public static class TripulanteMapper
 ---
 
 <a id="swagger-openapi"></a>
+<a id="13-swagger--openapi"></a>
 
 # 13. Swagger / OpenAPI
 
@@ -2354,6 +2368,7 @@ Swashbuckle necesita MENOS anotaciones porque el tipo del return (`ActionResult<
 ---
 
 <a id="probar-la-api-swagger-ui-y-postman"></a>
+<a id="14-probar-la-api-swagger-ui-y-postman"></a>
 
 # 14. Probar la API: Swagger UI y Postman
 
@@ -2465,6 +2480,7 @@ catch (NotFoundException ex)
 ---
 
 <a id="resumen-mapa-completo-del-proyecto"></a>
+<a id="15-resumen-mapa-completo-del-proyecto"></a>
 
 # 15. Resumen: mapa completo del proyecto
 
