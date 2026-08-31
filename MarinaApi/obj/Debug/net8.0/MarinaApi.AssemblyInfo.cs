@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MarinaApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c23de63a74052949be8036de4f2a898972a9176f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+c52b30aa4fd6ffdeafcaaf4ecb817a8363acf4a3")]
 [assembly: System.Reflection.AssemblyProductAttribute("MarinaApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MarinaApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
