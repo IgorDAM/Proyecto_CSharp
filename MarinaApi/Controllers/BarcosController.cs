@@ -74,6 +74,12 @@ public class BarcosController : ControllerBase
     public async Task<ActionResult<List<BarcoDto>>> GetByTipo(string tipo, CancellationToken ct) =>
         Ok(await _barcoService.FindByTipoAsync(tipo, ct));
 
+    /// <summary>Filtra barcos por capacidad mínima.</summary>
+    [HttpGet("capacidad/{minima:int}")]
+    [ProducesResponseType(typeof(List<BarcoDto>), StatusCodes.Status200OK)]
+    public async Task<ActionResult<List<BarcoDto>>> GetByCapacidadMinima(int minima, CancellationToken ct) =>
+Ok(await _barcoService.FindByCapacidadMinimaAsync(minima, ct));
+
     /// <summary>Cuenta barcos de un tipo concreto.</summary>
     [HttpGet("tipo/{tipo}/count")]
     [ProducesResponseType(typeof(long), StatusCodes.Status200OK)]

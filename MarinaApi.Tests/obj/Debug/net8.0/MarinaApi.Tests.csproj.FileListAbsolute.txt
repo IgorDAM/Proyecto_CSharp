@@ -152,3 +152,4 @@ D:\DAM\PROYECTOS\Marina_C#\MarinaApi.Tests\obj\Debug\net8.0\refint\MarinaApi.Tes
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi.Tests\obj\Debug\net8.0\MarinaApi.Tests.pdb
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi.Tests\obj\Debug\net8.0\MarinaApi.Tests.genruntimeconfig.cache
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi.Tests\obj\Debug\net8.0\ref\MarinaApi.Tests.dll
+D:\DAM\PROYECTOS\Marina_C#\MarinaApi.Tests\obj\Debug\net8.0\MarinaApi.Tests.sourcelink.json

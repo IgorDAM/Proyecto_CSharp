@@ -160,4 +160,23 @@ public class BarcoServiceTests
         resultado.Eslora.Should().Be(12);
         _repositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Barco>(), It.IsAny<CancellationToken>()), Times.Once);
     }
+
+    [Fact] // Test para el método FindByCapacidadMinimaAsync
+    public async Task FindByCapacidadMinimaAsync_DevuelveBarcosFiltrados()
+    {
+        // Arrange
+        var barcos = new List<Barco>
+    {
+        new() { Id = 1, Nombre = "Test", Tipo = "Velero", Capacidad = 40 }
+    };
+        _repositoryMock.Setup(r => r.FindByCapacidadGreaterThanOrEqualAsync(30, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(barcos);
+
+        // Act
+        var resultado = await _service.FindByCapacidadMinimaAsync(30);
+
+        // Assert
+        resultado.Should().HaveCount(1);
+        resultado[0].Nombre.Should().Be("Test");
+    }
 }

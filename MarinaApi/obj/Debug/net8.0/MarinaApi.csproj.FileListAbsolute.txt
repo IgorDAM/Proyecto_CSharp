@@ -139,3 +139,4 @@ D:\DAM\PROYECTOS\Marina_C#\MarinaApi\obj\Debug\net8.0\refint\MarinaApi.dll
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi\obj\Debug\net8.0\MarinaApi.pdb
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi\obj\Debug\net8.0\MarinaApi.genruntimeconfig.cache
 D:\DAM\PROYECTOS\Marina_C#\MarinaApi\obj\Debug\net8.0\ref\MarinaApi.dll
+D:\DAM\PROYECTOS\Marina_C#\MarinaApi\obj\Debug\net8.0\MarinaApi.sourcelink.json

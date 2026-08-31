@@ -17,6 +17,8 @@ public interface IBarcoService
     Task<List<BarcoDto>> FindByTipoAsync(string tipo, CancellationToken ct = default);
     Task<long> CountByTipoAsync(string tipo, CancellationToken ct = default);
     Task<double> GetPromedioEsloraByTipoAsync(string tipo, CancellationToken ct = default);
+
+    Task<List<BarcoDto>> FindByCapacidadMinimaAsync(int capacidadMinima, CancellationToken ct = default);
 }
 
 public class BarcoService : IBarcoService
@@ -105,5 +107,11 @@ public class BarcoService : IBarcoService
         var promedio = await _barcoRepository.GetPromedioEsloraByTipoAsync(tipo, ct);
         _logger.LogInformation("📊 Promedio de eslora para tipo '{Tipo}': {Promedio:F2} metros", tipo, promedio);
         return promedio;
+    }
+
+    public async Task<List<BarcoDto>> FindByCapacidadMinimaAsync(int capacidadMinima, CancellationToken ct = default)
+    {
+        var barcos = await _barcoRepository.FindByCapacidadGreaterThanOrEqualAsync(capacidadMinima, ct);
+        return barcos.Select(b => b.ToDto()).ToList();
     }
 }

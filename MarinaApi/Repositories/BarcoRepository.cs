@@ -24,6 +24,9 @@ public interface IBarcoRepository : IGenericRepository<Barco>
 
     // Equivalente a: @Query("SELECT AVG(b.eslora) FROM Barco b WHERE b.tipo = :tipo") (Cap. 8.2.5)
     Task<double> GetPromedioEsloraByTipoAsync(string tipo, CancellationToken ct = default);
+
+    // Equivalente a: @Query("SELECT b FROM Barco b WHERE b.capacidad >= :capacidadMinima") (Cap. 8.2.5)
+    Task<List<Barco>> FindByCapacidadGreaterThanOrEqualAsync(int capacidadMinima, CancellationToken ct = default);
 }
 
 public class BarcoRepository : GenericRepository<Barco>, IBarcoRepository
@@ -64,4 +67,7 @@ public class BarcoRepository : GenericRepository<Barco>, IBarcoRepository
         await _context.Barcos
             .Where(b => b.Tipo == tipo)
             .AverageAsync(b => (double)b.Eslora, ct);
+
+    public async Task<List<Barco>> FindByCapacidadGreaterThanOrEqualAsync(int capacidadMinima, CancellationToken ct = default) =>
+await _context.Barcos.Where(b => b.Capacidad >= capacidadMinima).ToListAsync(ct);
 }
