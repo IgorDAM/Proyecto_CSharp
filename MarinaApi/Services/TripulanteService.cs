@@ -19,10 +19,12 @@ public interface ITripulanteService
 public class TripulanteService : ITripulanteService
 {
     private readonly ITripulanteRepository _tripulanteRepository;
+    private readonly IBarcoRepository _barcoRepository;
 
-    public TripulanteService(ITripulanteRepository tripulanteRepository)
+    public TripulanteService(ITripulanteRepository tripulanteRepository, IBarcoRepository barcoRepository)
     {
         _tripulanteRepository = tripulanteRepository;
+        _barcoRepository = barcoRepository;
     }
 
     public async Task<List<TripulanteDto>> FindAllAsync(CancellationToken ct = default) =>
@@ -35,8 +37,11 @@ public class TripulanteService : ITripulanteService
         return tripulante.ToDto();
     }
 
-        public async Task<TripulanteDto> CreateAsync(TripulanteRequestDto dto, CancellationToken ct = default)
+    public async Task<TripulanteDto> CreateAsync(TripulanteRequestDto dto, CancellationToken ct = default)
     {
+        if (!await _barcoRepository.ExistsAsync(dto.BarcoId, ct))
+            throw new NotFoundException(nameof(Models.Barco), dto.BarcoId);
+
         var creado = await _tripulanteRepository.AddAsync(dto.ToEntity(), ct);
         return creado.ToDto();
     }
@@ -45,6 +50,10 @@ public class TripulanteService : ITripulanteService
     {
         var tripulante = await _tripulanteRepository.FindByIdAsync(id, ct)
             ?? throw new NotFoundException(nameof(Models.Tripulante), id);
+
+        if (!await _barcoRepository.ExistsAsync(dto.BarcoId, ct))
+            throw new NotFoundException(nameof(Models.Barco), dto.BarcoId);
+
         tripulante.UpdateFromDto(dto);
         await _tripulanteRepository.UpdateAsync(tripulante, ct);
         return tripulante.ToDto();
