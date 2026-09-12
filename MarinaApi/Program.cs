@@ -28,10 +28,11 @@ builder.Services.AddDbContext<MarinaDbContext>(options =>
 builder.Services.AddScoped<IBarcoRepository, BarcoRepository>();
 builder.Services.AddScoped<IAmarreRepository, AmarreRepository>();
 builder.Services.AddScoped<IRegataRepository, RegataRepository>();
-
+builder.Services.AddScoped<ITripulanteRepository, TripulanteRepository>();
 builder.Services.AddScoped<IBarcoService, BarcoService>();
 builder.Services.AddScoped<IAmarreService, AmarreService>();
 builder.Services.AddScoped<IRegataService, RegataService>();
+builder.Services.AddScoped<ITripulanteService, TripulanteService>();
 
 // ── Swagger / OpenAPI (equivalente a springdoc-openapi del Capítulo 15) ──
 builder.Services.AddEndpointsApiExplorer();

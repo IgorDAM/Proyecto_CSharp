@@ -39,28 +39,16 @@ public class MarinaDbContext : DbContext
             .WithMany(r => r.Barcos)
             .UsingEntity(j => j.ToTable("BarcoRegata"));
 
-        // ── Relación 1:N Barco ↔ Tripulante ──
-        // Tripulante es la entidad propietaria (tiene la FK BarcoId), igual que en
-        // Java donde Tripulante llevaba @ManyToOne + @JoinColumn(name = "barco_id").
-        // EF Core 5+ genera la tabla intermedia "BarcoTripulante" automáticamente,
-        // sin necesidad de una clase Java extra para representarla.
-        //Fluent API: Configuración de la relación 1:N entre Barco y Tripulante
-        modelBuilder.Entity<Tripulante>()
-            .HasOne(t => t.Barco)
-            .WithMany(b => b.Tripulantes)
-            .HasForeignKey(t => t.BarcoId)
-            .OnDelete(DeleteBehavior.Cascade);
-        //Fluent API: Configuración de la relación 1:N entre Barco y Tripulante
-
-
-
-        // EF Core 5+ genera la tabla intermedia "BarcoTripulante"
-        // automáticamente, sin necesidad de una clase Java extra para representarla.
-        modelBuilder.Entity<Barco>()
-            .HasMany(b => b.Tripulantes)
-            .WithOne(t => t.Barco)
-            .HasForeignKey(t => t.BarcoId)
-            .OnDelete(DeleteBehavior.Cascade); // equivalente a cascade = CascadeType.ALL + orphanRemoval
+// ── Relación 1:N Barco ↔ Tripulante ──
+// Tripulante es la entidad propietaria (tiene la FK BarcoId), igual que en
+// Java donde Tripulante llevaba @ManyToOne + @JoinColumn(name = "barco_id").
+// A diferencia de Barco↔Regata, esto NO genera tabla intermedia: la FK
+// BarcoId vive directamente como columna en la tabla Tripulantes.
+modelBuilder.Entity<Tripulante>()
+    .HasOne(t => t.Barco)
+    .WithMany(b => b.Tripulantes)
+    .HasForeignKey(t => t.BarcoId)
+    .OnDelete(DeleteBehavior.Cascade);
 
         // ── Relación 1:N Organizador ↔ Regata ──
         modelBuilder.Entity<Regata>()// Lado propietario: Regata tiene la FK OrganizadorId

@@ -2127,7 +2127,25 @@ public static class BarcoMapper
 
 > **TIP:** el `this` antes del primer parámetro convierte el método estático en un **extension method** — puedes escribir `barco.ToDto()` en vez de `BarcoMapper.ToDto(barco)`. Esto se encadena de maravilla con LINQ: `barcos.Select(b => b.ToDto()).ToList()`, exactamente igual que `barcos.stream().map(BarcoMapper::toDTO).collect(toList())` en Java (Cap. 14.6), pero sin necesidad de *method reference* explícito.
 
-## 12.5. Ejercicio
+## 12.5. FK obligatoria vs. FK opcional en el DTO de entrada
+
+Comparando `Dtos/AmarreDtos.cs` con el `TripulanteDtos.cs` que acabas de escribir, hay una diferencia que no es casualidad:
+
+```csharp
+// Amarre.BarcoId es "long?" en el modelo → un amarre puede no tener barco todavía.
+// El request NO lleva BarcoId: la asignación se hace en otro paso.
+public record AmarreRequestDto(string Ubicacion, double Precio, int Profundidad, int Longitud, bool Electricidad);
+
+// Tripulante.BarcoId es "long" (no nullable) en el modelo → un tripulante
+// no puede existir sin barco. El request SÍ lleva BarcoId, obligatorio desde el alta.
+public record TripulanteRequestDto(string Nombre, string Rol, long BarcoId);
+```
+
+En Java, para expresar "este id es obligatorio" normalmente usabas un `Long` (wrapper, nullable) más una anotación `@NotNull` que se comprueba en tiempo de ejecución al validar el DTO — el propio tipo del campo no impedía que llegase `null` antes de esa validación. En C#, `long` (sin `?`) es un value type que **no puede ser `null`** a nivel de lenguaje: si el JSON de entrada no trae `barcoId`, el *model binding* de ASP.NET Core falla antes siquiera de llegar a tu código, con un 400 automático. Si en el modelo la relación es opcional, el tipo es `long?` (nullable value type) y entonces sí puede faltar. La regla de negocio queda codificada en el tipo, no solo en una anotación de validación.
+
+Esto también explica por qué `TripulanteMapper.UpdateFromDto` sí reescribe `BarcoId` y `BarcoMapper.UpdateFromDto` no toca ninguna FK: `Barco` no tiene FK propia, y `Tripulante.BarcoId` es un dato obligatorio del propio tripulante, así que un update normal lo trata como cualquier otro campo editable.
+
+## 12.6. Ejercicio
 
 ### Solución: DTOs y Mappers Tipados
 
