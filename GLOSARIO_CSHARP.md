@@ -129,6 +129,81 @@ var dtos = barcos.Select(b => b.ToDto()).ToList();  // se encadena con LINQ sin 
 
 ## .NET / ASP.NET Core
 
+### Scoped
+
+**Qué es:** uno de los tres "tiempos de vida" (lifetimes) de un servicio registrado en el contenedor de inyección de dependencias de .NET: **Transient** (instancia nueva cada vez que se pide), **Scoped** (una instancia por scope — en ASP.NET Core, un scope = una petición HTTP; todos los que lo pidan dentro de la misma request reciben la misma instancia) y **Singleton** (una única instancia para toda la vida de la aplicación).
+
+**Equivalente en Java/Spring:** los bean scopes — `@Scope("prototype")` ≈ Transient, `@Scope("singleton")` ≈ Singleton, `@RequestScope` (`@Scope("request")`) ≈ Scoped exactamente.
+
+**La trampa viniendo de Spring:** en Spring el scope por defecto de cualquier bean es `singleton` si no se dice nada explícitamente. En ASP.NET Core no hay valor por defecto: cada `AddScoped`/`AddTransient`/`AddSingleton` es una decisión explícita al registrar el servicio.
+
+**Por qué en el proyecto casi todo es `AddScoped` (`Program.cs`):**
+```csharp
+builder.Services.AddScoped<IBarcoRepository, BarcoRepository>();
+builder.Services.AddScoped<IBarcoService, BarcoService>();
+```
+El motivo: `AddDbContext<MarinaDbContext>(...)` registra el `DbContext` como Scoped automáticamente (EF Core lo hace así por defecto), porque no es thread-safe y lleva el *change tracker* de esa petición — compartirlo entre requests simultáneas (Singleton) provocaría que dos usuarios se pisaran los cambios.
+
+Regla a respetar: un servicio Scoped no puede ser consumido de forma segura por uno Singleton (*captive dependency* — el framework lanza excepción al arrancar si lo detecta). Como `BarcoRepository` depende del `DbContext` (Scoped), tiene que ser Scoped también; como `BarcoService` depende del repositorio, Scoped otra vez — es un efecto cadena que "empuja" el lifetime hacia arriba.
+
+---
+
+### Model binder
+
+**Qué es:** el mecanismo de ASP.NET Core que coge los datos de una petición HTTP entrante (cuerpo, ruta, query string, cabeceras, formulario) y los convierte en los parámetros del action method, antes de ejecutar el código del método. Tú declaras el parámetro con un atributo que le dice de dónde sacar el valor; el binder hace la conversión/deserialización.
+
+Atributos principales: `[FromRoute]` (de la ruta, ej. `{id:long}`), `[FromQuery]` (query string, ej. `?tipo=Vela`), `[FromBody]` (cuerpo JSON — ver entrada propia), `[FromHeader]` (una cabecera HTTP), `[FromServices]` (inyecta un servicio del contenedor DI directamente como parámetro).
+
+**Equivalente en Java/Spring:** no hay un único concepto que lo agrupe todo con ese nombre — en Spring cada anotación (`@PathVariable`, `@RequestParam`, `@RequestBody`, `@RequestHeader`) hace su parte por separado, pero el mecanismo interno de mapear la petición a parámetros del método es el mismo concepto de fondo.
+
+---
+
+### [FromBody]
+
+**Qué es:** le dice al model binder que deserialice el JSON del cuerpo de la petición contra el tipo del parámetro. Ejemplo real (`Controllers/BarcosController.cs`):
+```csharp
+public async Task<ActionResult<BarcoDto>> Create([FromBody] BarcoRequestDto dto, CancellationToken ct)
+```
+El JSON del cliente se deserializa solo en un `BarcoRequestDto`, sin parsing manual.
+
+**Equivalente en Java/Spring:** `@RequestBody`, mismo concepto y mismo sitio:
+```java
+@PostMapping
+public ResponseEntity<BarcoDto> create(@RequestBody BarcoRequestDto dto) { ... }
+```
+
+**Diferencia real con Spring — validación automática:** en Spring, validar el body con las anotaciones (`@NotNull`, `@Size`...) exige añadir `@Valid` explícitamente junto a `@RequestBody`; si se te olvida, no se valida nada. En ASP.NET Core, gracias a `[ApiController]` en la clase del controller, la validación del modelo (DataAnnotations como `[Required]`, `[Range]`...) se dispara automáticamente en cuanto termina el binding — sin ningún `[Valid]` en el parámetro. Si falla, el framework devuelve 400 solo, antes de entrar al cuerpo del método. (`BarcoRequestDto` no tiene DataAnnotations todavía, pero en cuanto se le añada una empezará a validarse sin tocar el Controller.)
+
+Nota: con `[ApiController]`, para tipos complejos el `[FromBody]` a veces se puede omitir porque se infiere solo — pero escribirlo explícito, como en el proyecto, es más legible y lo esperable en un code review.
+
+---
+
+### Ok(await ...)
+
+Patrón muy repetido en los Controllers del proyecto — en realidad son dos piezas distintas encajadas.
+
+**`await` dentro de otra llamada:** en C# se puede poner `await` directamente dentro de los paréntesis de otra llamada, sin guardar el resultado en una variable antes:
+```csharp
+// Equivalentes:
+var barcos = await _barcoService.FindAllAsync(ct);
+return Ok(barcos);
+
+return Ok(await _barcoService.FindAllAsync(ct));  // más compacto
+```
+
+**`Ok(...)`:** método heredado de `ControllerBase` que envuelve el valor recibido en una respuesta HTTP 200 (`OkObjectResult`). Sobrecargas: `Ok()` → 200 sin cuerpo; `Ok(valor)` → 200 con `valor` serializado a JSON.
+
+**Equivalente en Java/Spring:**
+```java
+@GetMapping
+public ResponseEntity<List<BarcoDto>> getAll() {
+    return ResponseEntity.ok(barcoService.findAll());
+}
+```
+`Ok(x)` ≈ `ResponseEntity.ok(x)` — mismo helper, pero en Spring se llama como estático de la clase y en ASP.NET Core como método de instancia heredado por el controller. La diferencia real aparece en la versión async: en Java, sin `await`, habría que encadenar `.thenApply(lista -> ResponseEntity.ok(lista))` en vez del `await` inline de C#.
+
+---
+
 ### Action
 
 Término ambiguo en C#/.NET — dos sentidos distintos que conviene no mezclar.
@@ -206,13 +281,80 @@ _(pendiente de primeras entradas)_
 
 ## Testing (xUnit / Moq)
 
-_(pendiente de primeras entradas)_
+### Arrange / Act / Assert (AAA)
+
+**Qué es:** el patrón estándar para estructurar un test unitario en tres bloques separados:
+- **Arrange**: preparas lo necesario — datos, mocks configurados, estado inicial.
+- **Act**: ejecutas la única acción que se está probando (normalmente una línea).
+- **Assert**: compruebas que el resultado es el esperado.
+
+**Ejemplo real (`MarinaApi.Tests/BarcoServiceTests.cs`):**
+```csharp
+[Fact]
+public async Task FindByIdAsync_CuandoExiste_DevuelveDto()
+{
+    // Arrange
+    var barco = new Barco { Id = 1, Nombre = "Estrella del Mar", Tipo = "Velero", Eslora = 12 };
+    _repositoryMock.Setup(r => r.FindByIdAsync(1, It.IsAny<CancellationToken>()))
+        .ReturnsAsync(barco);
+
+    // Act
+    var resultado = await _service.FindByIdAsync(1);
+
+    // Assert
+    resultado.Nombre.Should().Be("Estrella del Mar");
+    resultado.Id.Should().Be(1);
+}
+```
+
+**Por qué a veces aparecen "Act + Assert" fusionados** (como en el propio proyecto): cuando lo que se comprueba es que el método lanza una excepción, no se puede separar "ejecutar" de "comprobar" — la propia llamada, envuelta en el assert, es la que dispara la excepción que se está verificando:
+```csharp
+[Fact]
+public async Task FindByIdAsync_CuandoNoExiste_LanzaNotFoundException()
+{
+    // Arrange: el mock devuelve null, como session.find() en Java cuando no hay resultado
+    _repositoryMock.Setup(r => r.FindByIdAsync(999, It.IsAny<CancellationToken>()))
+        .ReturnsAsync((Barco?)null);
+
+    // Act + Assert
+    await FluentActions.Awaiting(() => _service.FindByIdAsync(999))
+        .Should().ThrowAsync<NotFoundException>();
+}
+```
+
+**Equivalente en Java:** el mismo patrón AAA se usa igual con JUnit + Mockito (`when(...).thenReturn(...)` para Arrange, la llamada para Act, `assertEquals`/`assertThrows` para Assert). No es una diferencia de lenguaje sino una convención universal de testing — solo cambia la sintaxis de las librerías (`Mock.Setup` vs `Mockito.when`, FluentAssertions `Should().Be()` vs `assertEquals` de JUnit).
 
 ---
 
 ## Git / Azure DevOps
 
-_(pendiente de primeras entradas)_
+### LGTM
+
+**Qué es:** acrónimo de "Looks Good To Me". Comentario/aprobación estándar en un Pull Request que indica que el reviewer ha revisado el código y lo aprueba para mergear.
+
+**Equivalente en Java/Spring:** mismo concepto en cualquier flujo de PR (GitHub, GitLab, Bitbucket, Azure DevOps) — no es específico de .NET, es cultura de Git en general, independiente del lenguaje o framework.
+
+**Ejemplo de uso:** comentario en el PR → `LGTM, buen trabajo con la validación de FK 👍` seguido de pulsar "Approve" (o "Submit review" en GitHub).
+
+**Nota del proyecto:** GitHub no permite auto-aprobar tu propio PR ("You can't approve your own pull request"). En un equipo real esto obliga a que otra persona revise; en la simulación, cuando no hay un segundo reviewer real, se deja el comentario como constancia del review pero se usa "Comment" en vez de "Approve".
+
+---
+
+### Squash and merge
+
+**Qué es:** una de las tres estrategias de merge de un Pull Request en GitHub/Azure DevOps. Coge todos los commits de la rama (p.ej. `wip: Repository`, `wip: DTOs`, `feat: Controller`) y los aplasta en un único commit que se aplica sobre la rama base (`master`), con un solo mensaje limpio.
+
+**Alternativas:**
+- *Merge commit*: conserva todos los commits originales de la rama + añade uno de merge encima.
+- *Rebase and merge*: reescribe los commits de la rama encima de `master` sin commit de merge (historial lineal, pero cambian los SHA de los commits).
+
+**Equivalente en Java/Spring:** no aplica — es una opción de configuración de la plataforma de Git (GitHub/Azure DevOps/GitLab), totalmente independiente del lenguaje.
+
+**Cuándo usarlo:** cuando la rama tiene commits `wip:`/intermedios de trabajo que no aportan valor individual en el historial final. Común en equipos Scrum: un commit limpio por ticket cerrado.
+
+**Ejemplo (real del proyecto):** rama `feature/crud-tripulante` con commits `wip: TripulanteRepository`, `wip: DTOs, Mapper y Service...`, `feat: TripulantesController...`, `test: TripulanteServiceTests...` → tras squash and merge, en `master` aparece un único commit: `feat: CRUD de Tripulante (#150)`.
+
+---
 
 ---
 
