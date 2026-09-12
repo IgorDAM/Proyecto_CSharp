@@ -1,0 +1,10 @@
+# Carpetas de compilación .NET
+bin/
+obj/
+
+# Archivos de usuario de Visual Studio (configuración local, no se comparte)
+*.user
+.vs/
+
+# Rider / JetBrains
+.idea/
