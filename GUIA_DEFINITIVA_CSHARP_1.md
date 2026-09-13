@@ -5,27 +5,27 @@
 
 # Índice
 
-1. [Introducción](#introducción)
-2. [Lección 1: Sintaxis C#](#lección-1-sintaxis-c-para-quién-viene-de-java)
-3. [Lección 2: Colecciones y LINQ](#lección-2-colecciones-y-linq)
-4. [Lección 3: Async/Await](#lección-3-asyncawait-y-manejo-de-excepciones)
-5. [Mini-proyecto: Gestor de Biblioteca](#mini-proyecto-gestor-de-biblioteca)
-6. [Lección 4: Generics](#lección-4-generics)
-7. [Lección 5: Delegates y Eventos](#lección-5-delegates-y-eventos)
-8. [Lección 6: Patrones de Diseño](#lección-6-patrones-de-diseño)
-9. [Lección 7: SQL](#lección-7-sql-oracle-y-t-sql)
-10. [Lección 8: Entity Framework](#lección-8-entity-framework-core)
-11. [Lección 9: Git](#lección-9-git-avanzado)
-12. [Lección 10: Scrum](#lección-10-scrum-y-agile)
-13. [Lección 11: Frontend](#lección-11-frontend)
-14. [Lección 12: TypeScript](#lección-12-typescript)
-15. [Resumen Final](#resumen-final)
+1. [[#Introducción]]
+2. [[#Lección 1: Sintaxis C# para quién viene de Java|Lección 1: Sintaxis C#]]
+3. [[#Lección 2: Colecciones y LINQ]]
+4. [[#Lección 3: Async/Await y manejo de excepciones|Lección 3: Async/Await]]
+5. [[#Mini-proyecto: Gestor de Biblioteca]]
+6. [[#Lección 4: Generics]]
+7. [[#Lección 5: Delegates y Eventos]]
+8. [[#Lección 6: Patrones de Diseño]]
+9. [[#Lección 7: SQL — Oracle y T-SQL|Lección 7: SQL]]
+10. [[#Lección 8: Entity Framework Core|Lección 8: Entity Framework]]
+11. [[#Lección 9: Git Avanzado|Lección 9: Git]]
+12. [[#Lección 10: Scrum y Agile|Lección 10: Scrum]]
+13. [[#Lección 11: Frontend]]
+14. [[#Lección 12: TypeScript]]
+15. [[#Resumen Final]]
 
 ---
 
 # Introducción
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en Espiral MS. Este curso está diseñado específicamente para alguien que viene de Java y necesita estar preparado para un entorno profesional de .NET.
 
@@ -44,7 +44,7 @@ Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en Espira
 
 # Lección 1: Sintaxis C# para quién viene de Java
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 1.1 Estructura básica de un programa
 
@@ -312,7 +312,7 @@ int[] mitad = numeros[1..3]; // elementos en posiciones 1 y 2
 
 # Lección 2: Colecciones y LINQ
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 2.1 Colecciones principales
 
@@ -508,7 +508,7 @@ Con una lista de al menos 5 libros:
 
 # Lección 3: Async/Await y manejo de excepciones
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 3.1 Manejo de excepciones
 
@@ -725,7 +725,7 @@ Es exactamente el LINQ de la Lección 2, combinado con lo que acabas de aprender
 
 # Mini-proyecto: Gestor de Biblioteca
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## Estructura
 
@@ -862,7 +862,7 @@ namespace repositorio
 
 # Lección 4: Generics
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 4.1 Generics "reificados"
 
@@ -1010,7 +1010,7 @@ Esto es literalmente cómo está construido `Dictionary<TKey, TValue>` intername
 
 # Lección 5: Delegates y Eventos
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 5.1 ¿Qué es un delegate?
 
@@ -1138,7 +1138,7 @@ gestor.NotificacionEnviada -= ManejarNotificacion; // deja de recibir notificaci
 
 # Lección 6: Patrones de Diseño
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 6.1 ¿Por qué patrones de diseño?
 
@@ -1358,7 +1358,7 @@ En Espiral MS verás esta combinación constantemente: interfaz + implementació
 
 # Lección 7: SQL — Oracle y T-SQL
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 7.1 DDL — Crear la estructura de la base de datos
 
@@ -1611,7 +1611,7 @@ SELECT @NuevoId;
 
 # Lección 8: Entity Framework Core
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 8.1 ¿Qué es EF Core?
 
@@ -1896,7 +1896,7 @@ Fíjate que **todos** los métodos de EF Core que tocan la base de datos termina
 
 # Lección 9: Git Avanzado
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 9.1 Git Flow — el modelo de ramas estándar en empresa
 
@@ -2114,7 +2114,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 # Lección 10: Scrum y Agile
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 10.1 ¿Qué es Scrum?
 
@@ -2302,7 +2302,7 @@ Simula un mini-sprint sobre tu proyecto de biblioteca:
 
 # Lección 11: Frontend
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 11.1 HTML5 Semántico
 
@@ -2562,7 +2562,7 @@ const todosPositivos = numeros.every(n => n > 0);           // como .All()
 
 # Lección 12: TypeScript
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 12.1 ¿Qué es TypeScript y por qué usarlo?
 
@@ -2737,7 +2737,7 @@ npx tsc --watch          # recompila automáticamente al guardar
 
 # Resumen Final
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## Lo que has aprendido
 

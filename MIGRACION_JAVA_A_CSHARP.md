@@ -12,27 +12,27 @@
 
 # Índice
 
-1. [Introducción: Hibernate vs Entity Framework Core](#1-introducción-hibernate-vs-entity-framework-core)
-2. [Configuración del proyecto](#2-configuración-del-proyecto)
-3. [Entidades y Mapeo](#3-entidades-y-mapeo)
-4. [Relaciones entre Entidades](#4-relaciones-entre-entidades)
-5. [Estados y Change Tracking](#5-estados-y-change-tracking)
-6. [Repositorio Genérico (vs DAO)](#6-repositorio-genérico-vs-dao)
-7. [Consultas con LINQ (vs HQL/Criteria)](#7-consultas-con-linq-vs-hqlcriteria)
-8. [Testing con xUnit y Moq (vs JUnit/Mockito)](#8-testing-con-xunit-y-moq-vs-junitmockito)
-9. [ASP.NET Core Web API (vs Spring Boot)](#9-aspnet-core-web-api-vs-spring-boot)
-10. [Capa de Servicio](#10-capa-de-servicio)
-11. [API REST con Controllers](#11-api-rest-con-controllers)
-12. [DTOs y Mapper](#12-dtos-y-mapper)
-13. [Swagger / OpenAPI](#13-swagger--openapi)
-14. [Probar la API: Swagger UI y Postman](#14-probar-la-api-swagger-ui-y-postman)
-15. [Resumen: mapa completo del proyecto](#15-resumen-mapa-completo-del-proyecto)
+1. [[#1. Introducción: Hibernate vs Entity Framework Core|Introducción: Hibernate vs Entity Framework Core]]
+2. [[#2. Configuración del proyecto|Configuración del proyecto]]
+3. [[#3. Entidades y Mapeo|Entidades y Mapeo]]
+4. [[#4. Relaciones entre Entidades|Relaciones entre Entidades]]
+5. [[#5. Estados y Change Tracking|Estados y Change Tracking]]
+6. [[#6. Repositorio Genérico (vs DAO)|Repositorio Genérico (vs DAO)]]
+7. [[#7. Consultas con LINQ (vs HQL/Criteria)|Consultas con LINQ (vs HQL/Criteria)]]
+8. [[#8. Testing con xUnit y Moq (vs JUnit/Mockito)|Testing con xUnit y Moq (vs JUnit/Mockito)]]
+9. [[#9. ASP.NET Core Web API (vs Spring Boot)|ASP.NET Core Web API (vs Spring Boot)]]
+10. [[#10. Capa de Servicio|Capa de Servicio]]
+11. [[#11. API REST con Controllers|API REST con Controllers]]
+12. [[#12. DTOs y Mapper|DTOs y Mapper]]
+13. [[#13. Swagger / OpenAPI|Swagger / OpenAPI]]
+14. [[#14. Probar la API: Swagger UI y Postman|Probar la API: Swagger UI y Postman]]
+15. [[#15. Resumen: mapa completo del proyecto|Resumen: mapa completo del proyecto]]
 
 ---
 
 # 1. Introducción: Hibernate vs Entity Framework Core
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 1.1. Mismo problema, dos soluciones
 
@@ -89,7 +89,7 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 
 # 2. Configuración del proyecto
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 2.1. El equivalente al `pom.xml`: `.csproj`
 
@@ -261,7 +261,7 @@ BarcoRegata  ← Tabla intermedia N:M (generada automáticamente por EF Core)
 
 # 3. Entidades y Mapeo
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 3.1. `@Entity` no existe en EF Core — y eso es intencional
 
@@ -502,7 +502,7 @@ public class Barco
 
 # 4. Relaciones entre Entidades
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 4.1. `mappedBy` no existe en EF Core
 
@@ -724,7 +724,7 @@ dotnet ef database update
 
 # 5. Estados y Change Tracking
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 5.1. Los 4 estados de Hibernate vs el Change Tracker de EF Core
 
@@ -876,7 +876,7 @@ await _context.SaveChangesAsync();  // Genera UPDATE solo
 
 # 6. Repositorio Genérico (vs DAO)
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 6.1. El problema que Java resolvía a medias
 
@@ -1058,7 +1058,7 @@ public async Task<List<Barco>> FindByCapacidadGreaterThanAsync(int capacidad, Ca
 
 # 7. Consultas con LINQ (vs HQL/Criteria)
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 7.1. Una sola herramienta para las tres que usaba Java
 
@@ -1317,7 +1317,7 @@ No hay compromiso — simplemente escribes la condición en C# y EF Core la trad
 
 # 8. Testing con xUnit y Moq (vs JUnit/Mockito)
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 8.1. Correspondencia directa de conceptos
 
@@ -1590,7 +1590,7 @@ public async Task UpdateAsync_CuandoNoExiste_LanzaNotFoundException()
 
 # 9. ASP.NET Core Web API (vs Spring Boot)
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 9.1. El "gran cambio" de Java, aplicado también en C#
 
@@ -1719,7 +1719,7 @@ public class BarcosController : ControllerBase
 
 # 10. Capa de Servicio
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 10.1. `@Service` → clase C# + registro explícito
 
@@ -1859,7 +1859,7 @@ public async Task<List<BarcoDto>> FindTop5ByCapacidadAsync(CancellationToken ct 
 
 # 11. API REST con Controllers
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 11.1. `@RestController` → `[ApiController]`
 
@@ -2054,7 +2054,7 @@ Invoke-WebRequest -Uri "http://localhost:5000/api/barcos/eslora/12" `
 
 # 12. DTOs y Mapper
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 12.1. El mismo problema, la misma solución
 
@@ -2240,7 +2240,7 @@ public static class TripulanteMapper
 
 # 13. Swagger / OpenAPI
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 13.1. Springdoc vs Swashbuckle
 
@@ -2345,7 +2345,7 @@ Swashbuckle necesita MENOS anotaciones porque el tipo del return (`ActionResult<
 
 # 14. Probar la API: Swagger UI y Postman
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 14.1. Todo lo de tu Cap. 16 se aplica igual
 
@@ -2411,6 +2411,30 @@ Body (JSON - RFC 7807 "problem+json"):
 | **Debugging** | Difícil (vacío) | Fácil (mensaje claro) |
 | **Trace ID** | No | Sí (para logs) |
 
+### Ampliación: el mismo patrón para conflictos de negocio (ticket #151)
+
+`NotFoundException` no es la única excepción de dominio del proyecto. Cuando una operación viola una regla de negocio de estado (no un "no encontrado", sino algo como "esto ya está ocupado"), el código HTTP correcto no es 404 sino **409 Conflict** — y el mecanismo para llegar ahí es exactamente el mismo: una excepción de dominio + un `catch` más en `ExceptionHandlingMiddleware.cs`.
+
+Ejemplo real: al asignar un Amarre a un Barco, si ese Barco ya tiene otro Amarre asignado, se lanza `ConflictException` en vez de sobrescribir en silencio:
+
+```csharp
+// Exceptions/ConflictException.cs — mismo rol que NotFoundException, pero para 409
+public class ConflictException : Exception
+{
+    public ConflictException(string mensaje) : base(mensaje) { }
+}
+```
+
+```csharp
+// ExceptionHandlingMiddleware.cs — un catch más, mismo WriteProblemAsync
+catch (ConflictException ex)
+{
+    await WriteProblemAsync(context, HttpStatusCode.Conflict, ex.Message);
+}
+```
+
+**El patrón general**, generalizando: *regla de negocio violada → excepción de dominio específica → un `catch` en el middleware global → código HTTP semánticamente correcto*, sin repetir el chequeo en cada Controller. Añadir una tercera excepción de dominio (p.ej. una futura `ValidationException` para 422) seguiría exactamente esta misma receta. Ver `GLOSARIO_CSHARP.md` → Sintaxis C# → "Sobrecarga por tipo de retorno" para un bug real que surgió al implementar este ticket (no relacionado con el middleware, sino con el Repository).
+
 ### Por Qué Es Mejor
 
 Postman es agnóstico del lenguaje — funciona igual con REST en cualquier tecnología. Pero el **formato de error difiere**:
@@ -2454,7 +2478,7 @@ catch (NotFoundException ex)
 
 # 15. Resumen: mapa completo del proyecto
 
-[↑ Volver al índice](#índice)
+[[#Índice|↑ Volver al índice]]
 
 ## 15.1. Tabla maestra de equivalencias
 
