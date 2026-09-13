@@ -17,3 +17,5 @@ public record AmarreRequestDto(
     int Longitud,
     bool Electricidad
 );
+
+public record AsignarBarcoDto(long BarcoId);

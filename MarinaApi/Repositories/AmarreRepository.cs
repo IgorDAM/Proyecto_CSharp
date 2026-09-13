@@ -11,6 +11,7 @@ public interface IAmarreRepository : IGenericRepository<Amarre>
     Task<List<Amarre>> FindByPrecioLessThanAsync(double precio, CancellationToken ct = default);
     Task<List<Amarre>> FindByElectricidadAsync(bool electricidad, CancellationToken ct = default);
     Task<List<Amarre>> FindLibresAsync(CancellationToken ct = default); // findByBarcoIsNull en Java
+    Task<Amarre?> FindByBarcoIdAsync(long barcoId, CancellationToken ct = default);
 }
 
 public class AmarreRepository : GenericRepository<Amarre>, IAmarreRepository
@@ -33,4 +34,6 @@ public class AmarreRepository : GenericRepository<Amarre>, IAmarreRepository
 
     public async Task<List<Amarre>> FindLibresAsync(CancellationToken ct = default) =>
         await _context.Amarres.Where(a => a.BarcoId == null).ToListAsync(ct);
+    public async Task<Amarre?> FindByBarcoIdAsync(long barcoId, CancellationToken ct = default) =>
+    await _context.Amarres.FirstOrDefaultAsync(a => a.BarcoId == barcoId, ct);
 }

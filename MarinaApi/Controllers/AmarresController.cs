@@ -54,4 +54,14 @@ public class AmarresController : ControllerBase
     [ProducesResponseType(typeof(List<AmarreDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<AmarreDto>>> GetConElectricidad(CancellationToken ct) =>
         Ok(await _amarreService.FindConElectricidadAsync(ct));
+
+    [HttpPatch("{id:long}/barco")]
+    [ProducesResponseType(typeof(AmarreDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AmarreDto>> AsignarBarco(long id, [FromBody] AsignarBarcoDto dto, CancellationToken ct)
+    {
+        var actualizado = await _amarreService.AssignBarcoAsync(id, dto, ct);
+        return Ok(actualizado);
+    }
 }
