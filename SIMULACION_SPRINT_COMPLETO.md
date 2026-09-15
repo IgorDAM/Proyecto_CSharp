@@ -1,4 +1,4 @@
-# Simulación: Tu primer Sprint completo en Espiral MS
+# Simulación: Tu primer Sprint completo de prácticas
 
 **Cómo usar este documento:** simula una semana completa de sprint (Lunes-Viernes), con las ceremonias reales de Scrum. A diferencia de la simulación del "día 3", aquí el foco no es el detalle hora a hora, sino **el ciclo completo**: cómo se planifica, cómo evoluciona el trabajo día a día, qué pasa cuando algo se tuerce, y cómo se cierra. Cada ticket es una tarea real que vas a implementar en tu proyecto MarinaApi.
 

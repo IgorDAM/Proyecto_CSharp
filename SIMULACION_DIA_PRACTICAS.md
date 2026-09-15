@@ -1,4 +1,4 @@
-# Simulación: Día 3 de tu primera semana en Espiral MS
+# Simulación: Día 3 de tu primera semana de prácticas
 
 **Cómo usar este documento:** no es solo para leer. Cada bloque de hora tiene una acción real que puedes ejecutar (sobre tu proyecto MarinaApi) o una interacción simulada conmigo haciendo de compañero/a de equipo. Ve bloque a bloque, en orden, como si fuera un día real de trabajo.
 
@@ -199,7 +199,7 @@ git pull origin develop
 git branch -d feature/filtrar-barcos-capacidad
 ```
 
-**Sensación real:** tu primer ticket real, de principio a fin, cerrado. Esto es exactamente lo que sentirías el día que de verdad pase en Espiral MS.
+**Sensación real:** tu primer ticket real, de principio a fin, cerrado. Esto es exactamente lo que sentirías el día que de verdad pase en SEIDEL.
 
 ---
 

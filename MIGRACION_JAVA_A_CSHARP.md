@@ -42,7 +42,7 @@ Ya conoces el problema desde tu Capítulo 1 de Java: el **desajuste objeto-relac
 |---|---|---|
 | Especificación | JPA | No existe una "especificación" separada — EF Core es a la vez la interfaz y la implementación |
 | Implementación ORM | Hibernate | Entity Framework Core |
-| Motor de BD (Espiral MS) | MySQL (en tu tutorial) | **SQL Server** |
+| Motor de BD | MySQL (en tu tutorial) | **SQL Server** en MarinaApi (en SEIDEL: MySQL y PostgreSQL) |
 | Gestor de sesión/contexto | `Session` / `SessionFactory` | `DbContext` |
 | Colección de entidades | `session.createQuery("from Barco")` | `DbSet<Barco>` |
 
@@ -128,7 +128,7 @@ spring.datasource.username=root
 spring.datasource.password=root
 ```
 
-> **CUIDADO:** el proyecto usa **SQL Server**, no MySQL como el tutorial Java original — es el motor real de Espiral MS. Si alguna vez ves ejemplos en internet con `UseMySql(...)`, no los copies directamente: nuestro `Program.cs` usa `UseSqlServer(...)`.
+> **CUIDADO:** el proyecto usa **SQL Server**, no MySQL como el tutorial Java original, así que nuestro `Program.cs` usa `UseSqlServer(...)`. Si copias ejemplos de internet con `UseMySql(...)` o `UseNpgsql(...)`, no funcionarán tal cual aquí. En SEIDEL, que trabaja con MySQL y PostgreSQL, será al revés: esos son los proveedores que te encontrarás. Cómo cambiar de uno a otro está en la Lección 11.4 de `GUIA_DEFINITIVA_CSHARP_1.md`.
 
 ## 2.3. `Program.cs`: el equivalente a la autoconfiguración de Spring Boot
 
@@ -2503,7 +2503,7 @@ catch (NotFoundException ex)
 | Manejo de "no encontrado" | `if (x == null) return 404` en cada método | Excepción + Middleware global |
 | Testing | JUnit 5 + Mockito | xUnit + Moq + FluentAssertions |
 | Documentación API | Springdoc OpenAPI | Swashbuckle |
-| Motor de BD | MySQL (tutorial) | **SQL Server** (real, Espiral MS) |
+| Motor de BD | MySQL (tutorial) | **SQL Server** (MarinaApi; en SEIDEL, MySQL y PostgreSQL) |
 
 ## 15.2. Cómo sigue encajando con tu plan de verano
 

@@ -5,22 +5,27 @@ API REST) de gestión marítima y regatas. Mismo dominio (Barco, Amarre, Regata)
 misma arquitectura por capas, pero con mejoras aplicadas allí donde el
 ecosistema .NET lo permite de forma más limpia.
 
-## Alineado con la preparación para las prácticas en Espiral MS
+## Preparación para las prácticas en SEIDEL
 
-Este proyecto usa deliberadamente el mismo stack que verás en las prácticas,
-no el del tutorial Java original:
+Stack de SEIDEL frente a este proyecto:
 
-| | Tutorial Java original | Este proyecto (y Espiral MS) |
-|---|---|---|
-| Base de datos | MySQL | **SQL Server** |
-| Proveedor EF/ORM | Hibernate | **Entity Framework Core** |
-| Control de versiones | Git genérico | **Git / Azure DevOps** |
+| | Tutorial Java original | Este proyecto | SEIDEL |
+|---|---|---|---|
+| Lenguaje / framework | Java / Spring Boot | **C# / ASP.NET Core (.NET 8)** | .NET / C# |
+| Base de datos | MySQL | **SQL Server** | MySQL y PostgreSQL |
+| ORM | Hibernate | **Entity Framework Core** | — |
+| Integraciones | — | REST | Incluye sistemas legacy SOAP/XML |
+| Despliegue | — | Local (Docker) | Azure y AWS |
 
-Sirve como práctica directa de varios bloques de tu `GUIA_DEFINITIVA_CSHARP.md`:
+El lenguaje y el framework coinciden con los de SEIDEL. La base de datos no:
+cambiar de SQL Server a MySQL o PostgreSQL se explica en la Lección 11.4 de la guía.
+
+Sirve como práctica directa de varios bloques de `GUIA_DEFINITIVA_CSHARP_1.md`:
 - **Lección 6** (Patrones de Diseño: Repository, DI, Factory) → `Repositories/` y `Services/`
 - **Lección 8** (Entity Framework Core) → `Data/MarinaDbContext.cs`, migraciones con `dotnet ef`
-- **Lección 9** (Git avanzado) → usa este repo para practicar ramas `feature/*`, commits y PRs antes de subirlo a Azure DevOps
-- **Lección 10** (Scrum) → buen candidato para trocear en historias de usuario y practicar un sprint tú mismo (ver ejercicio de la Lección 10)
+- **Lecciones 11-13** (arquitectura backend, dominio y API lista para producción) → mejoras pendientes en `BACKLOG_MARINAAPI.md`
+- **Lección 16** (Git avanzado) → usa este repo para practicar ramas `feature/*`, commits y PRs
+- **Lección 17** (Scrum) → buen candidato para trocear en historias de usuario y practicar un sprint tú mismo
 
 ## Cómo ejecutar
 

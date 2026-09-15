@@ -11,9 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // ── DbContext (equivalente a application.properties: spring.datasource.*) ──
-// Usamos SQL Server (no MySQL como en el tutorial Java original) porque es el
-// motor real que se usa en Espiral MS — así el proyecto sirve también como
-// práctica directa de EF Core + SQL Server para las prácticas.
+// Usamos SQL Server (no MySQL como en el tutorial Java original) para practicar
+// EF Core con un motor distinto al del tutorial. En SEIDEL se trabaja con
+// MySQL y PostgreSQL: cambiar de proveedor es sustituir el paquete NuGet y
+// UseSqlServer por UseMySql (Pomelo) o UseNpgsql (Lección 11.4 de la guía).
 var connectionString = builder.Configuration.GetConnectionString("MarinaDb")
     ?? throw new InvalidOperationException("Falta la cadena de conexión 'MarinaDb' en appsettings.json");
 

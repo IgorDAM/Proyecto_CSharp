@@ -44,7 +44,7 @@ No intentes memorizar la guía. Lee la lección, escribe el código de los ejemp
 
 [[#Índice|↑ Volver al índice]]
 
-Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en Espiral MS. Este curso está diseñado específicamente para alguien que viene de Java y necesita estar preparado para un entorno profesional de .NET.
+Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en SEIDEL, una consultora asturiana que trabaja con .NET/C#, bases de datos MySQL y PostgreSQL, algún sistema legacy SOAP/XML y despliegue en Azure y AWS. Este curso está diseñado específicamente para alguien que viene de Java y necesita estar preparado para un entorno profesional de .NET.
 
 **Lo que lograrás:**
 - Dominar las diferencias clave entre Java y C#
@@ -142,7 +142,7 @@ libro2.Titulo = "Otro título";
 Console.WriteLine(libro1.Titulo); // "Otro título" (¡cambió también libro1!)
 ```
 
-`decimal` merece mención aparte: en Java usarías `BigDecimal` para cálculos monetarios exactos (evitar errores de coma flotante). En C#, `decimal` es un tipo nativo del lenguaje pensado exactamente para eso — lo verás en cualquier campo de precio o importe en Espiral MS.
+`decimal` merece mención aparte: en Java usarías `BigDecimal` para cálculos monetarios exactos (evitar errores de coma flotante). En C#, `decimal` es un tipo nativo del lenguaje pensado exactamente para eso — lo verás en cualquier campo de precio o importe de una aplicación de negocio.
 
 > 🧠 **Mentalidad Java → C#:** en Java, `==` sobre `String` compara referencias y por eso siempre usas `.equals()`. **En C# `==` sobre `string` compara el contenido**, porque `string` sobrecarga el operador. `"hola" == "hola"` es `true` sin sorpresas. Es de las poquísimas veces que C# es *menos* traicionero que Java, y casi nadie te lo cuenta.
 
@@ -473,7 +473,7 @@ var nombres = (from p in personas
                select p.Nombre).ToList();
 ```
 
-La sintaxis de método es la estándar en código profesional de .NET — es la que verás en Espiral MS.
+La sintaxis de método es la estándar en código profesional de .NET — la de consulta apenas aparece en proyectos reales.
 
 ---
 
@@ -911,7 +911,7 @@ catch (OperationCanceledException)
 
 ## 3.3 Por qué importa esto para la empresa
 
-En Espiral MS, cuando accedas a base de datos con Entity Framework (Lección 8), verás patrones como este constantemente:
+En cualquier backend .NET que acceda a base de datos con Entity Framework (Lección 8) verás patrones como este constantemente:
 
 ```csharp
 public async Task<List<Cliente>> ObtenerClientesAsync()
@@ -1202,7 +1202,7 @@ var repo = new RepositorioGenerico<Libro>();
 
 Este patrón es exactamente la base sobre la que funciona `DbSet<T>` en Entity Framework (Lección 8) — un repositorio genérico que sabe operar con cualquier entidad.
 
-> 💡 **Tip de diseño (nivel senior):** un repositorio genérico es tentador, pero no lo conviertas en dogma. Si `RepositorioGenerico<T>` acaba lleno de métodos que solo usa una entidad, o te obliga a exponer `IQueryable<T>` hacia fuera para poder consultar algo específico, ya no te está ahorrando trabajo: te está ocultando la intención. El patrón sano es **genérico para el CRUD trivial, repositorio específico para las consultas de negocio** (`ObtenerMorososConDeudaMayorQue(...)`). En Espiral MS verás las dos cosas conviviendo.
+> 💡 **Tip de diseño (nivel senior):** un repositorio genérico es tentador, pero no lo conviertas en dogma. Si `RepositorioGenerico<T>` acaba lleno de métodos que solo usa una entidad, o te obliga a exponer `IQueryable<T>` hacia fuera para poder consultar algo específico, ya no te está ahorrando trabajo: te está ocultando la intención. El patrón sano es **genérico para el CRUD trivial, repositorio específico para las consultas de negocio** (`ObtenerMorososConDeudaMayorQue(...)`). En proyectos reales es habitual ver las dos cosas conviviendo.
 
 ---
 
@@ -1681,7 +1681,7 @@ Program.cs (composición)
     └─ en tests: ILibroRepositorio → RepositorioMock          (mismo contrato, otra implementación)
 ```
 
-En Espiral MS verás esta combinación constantemente: interfaz + implementación real + implementación de test, todas intercambiables gracias a DI.
+En cualquier proyecto .NET profesional verás esta combinación constantemente: interfaz + implementación real + implementación de test, todas intercambiables gracias a DI.
 
 ---
 
@@ -2041,7 +2041,7 @@ public class AppDbContext : DbContext
 }
 ```
 
-**Nota importante:** en el entorno real de Espiral MS, la cadena de conexión NO se hardcodea así. Se lee desde `appsettings.json` mediante `IConfiguration` inyectado (esto lo verás con ASP.NET Core en las prácticas).
+**Nota importante:** en un proyecto real, la cadena de conexión NO se hardcodea así. Se lee desde `appsettings.json` mediante `IConfiguration` inyectado (esto lo verás con ASP.NET Core en las prácticas).
 
 ---
 
@@ -2353,7 +2353,7 @@ catch (DbUpdateConcurrencyException)
 }
 ```
 
-**Por qué importa en Espiral MS:** en cualquier aplicación con varios usuarios trabajando a la vez, el problema de "el último que guarda gana y borra el trabajo del otro" aparece tarde o temprano. Saber que existe la concurrencia optimista y cómo se activa es algo que no se espera de un becario — y por eso destaca.
+**Por qué importa en la empresa:** en cualquier aplicación con varios usuarios trabajando a la vez, el problema de "el último que guarda gana y borra el trabajo del otro" aparece tarde o temprano. Saber que existe la concurrencia optimista y cómo se activa es algo que no se espera de un becario — y por eso destaca.
 
 ---
 
@@ -2400,7 +2400,7 @@ public partial class AnadirCampoEmail : Migration
 }
 ```
 
-**Por qué importa en Espiral MS:** cuando trabajes en equipo, cada desarrollador genera sus propias migraciones al cambiar el modelo. Git las versiona igual que el código, y `dotnet ef database update` las aplica en orden. Nadie edita la BD a mano.
+**Por qué importa en la empresa:** cuando trabajes en equipo, cada desarrollador genera sus propias migraciones al cambiar el modelo. Git las versiona igual que el código, y `dotnet ef database update` las aplica en orden. Nadie edita la BD a mano.
 
 > ⚠️ **Cuidado:** **abre siempre el archivo de migración generado antes de aplicarlo.** EF Core a veces interpreta un renombrado de propiedad como "borrar columna + crear columna", lo que en producción significa **perder todos los datos de esa columna**. Si ves un `DropColumn` que no esperabas, cámbialo a mano por `RenameColumn`. Es un caso real y frecuente.
 
@@ -2629,7 +2629,7 @@ public static class StringExtensiones
 bool valido = "ana@example.com".EsEmailValido();  // se usa como si fuera un método de string
 ```
 
-> 💡 **Tip:** los métodos de extensión son la razón por la que LINQ existe. `Where`, `Select` y compañía no están dentro de `IEnumerable<T>`: son métodos de extensión definidos en `System.Linq.Enumerable`. Por eso, si se te olvida el `using System.Linq`, LINQ "desaparece" sin más y el error del compilador no menciona LINQ para nada. En Espiral MS los verás sobre todo para los *mappers* de DTOs: `libro.ToDto()`.
+> 💡 **Tip:** los métodos de extensión son la razón por la que LINQ existe. `Where`, `Select` y compañía no están dentro de `IEnumerable<T>`: son métodos de extensión definidos en `System.Linq.Enumerable`. Por eso, si se te olvida el `using System.Linq`, LINQ "desaparece" sin más y el error del compilador no menciona LINQ para nada. En proyectos reales los verás sobre todo para los *mappers* de DTOs: `libro.ToDto()`.
 
 > ⚠️ **Cuidado:** no abuses de los métodos de extensión sobre tipos del framework (`string`, `int`, `DateTime`). Contaminan el autocompletado de **todo el proyecto** y confunden a quien lee el código porque parecen parte del lenguaje. Regla: extensiones sobre tus propios tipos, o sobre tipos del framework solo cuando la utilidad sea evidente y esté en un namespace bien acotado.
 
@@ -3120,7 +3120,7 @@ Marina.sln
 
 **La ventaja no es estética, es que el compilador vigila la arquitectura:** como `Marina.Domain` no tiene referencia a EF Core, es *literalmente imposible* escribir `using Microsoft.EntityFrameworkCore;` en una entidad. Como `Marina.Application` no referencia `Marina.Infrastructure`, un servicio no puede instanciar `MarinaDbContext` aunque quiera. La regla de dependencia deja de ser una recomendación del README y pasa a ser un error de compilación.
 
-> 🧠 **Mentalidad Java → C#:** el equivalente en Java es un proyecto **Maven/Gradle multi-módulo** (`marina-domain`, `marina-application`...). Existe, pero en Spring Boot es poco habitual para proyectos medianos: casi todo el mundo usa un único módulo con paquetes, y como en Java la visibilidad por paquete es débil, se recurre a ArchUnit para vigilar dependencias. En .NET, crear varios `.csproj` es tan barato (un comando, y Visual Studio/Rider los gestionan de forma nativa) que es la opción por defecto en cuanto el proyecto pasa de juguete. Si llegas a una solución de SEIDEL con 6-10 proyectos, no es sobreingeniería: es lo normal.
+> 🧠 **Mentalidad Java → C#:** el equivalente en Java es un proyecto **Maven/Gradle multi-módulo** (`marina-domain`, `marina-application`...). Existe, pero en Spring Boot es poco habitual para proyectos medianos: casi todo el mundo usa un único módulo con paquetes, y como en Java la visibilidad por paquete es débil, se recurre a ArchUnit para vigilar dependencias. En .NET, crear varios `.csproj` es tan barato (un comando, y Visual Studio/Rider los gestionan de forma nativa) que es la opción por defecto en cuanto el proyecto pasa de juguete. Si en las prácticas llegas a una solución con 6-10 proyectos, no es sobreingeniería: es lo normal.
 
 ### Cada capa registra sus propios servicios
 
@@ -3216,7 +3216,7 @@ En N-Tier puro, la lógica de negocio depende de la capa de datos, así que no p
 | `IAmarreService` | Puerto de entrada (*driving port*) | *Input Boundary* / *Use Case* |
 | `AmarreService` | Núcleo de la aplicación | *Use Case Interactor* |
 
-> 💡 **Tip — vocabulario útil en SEIDEL:** el lenguaje de "puertos y adaptadores" brilla cuando hay **sistemas legacy**. Un servicio SOAP de hace 15 años que devuelve XML con nombres de campo en mayúsculas y fechas como texto no debería contaminar tu dominio. Se define un puerto limpio en Application (`IRegistroMaritimoClient` que devuelve un `record` tuyo) y un adaptador en Infrastructure que habla SOAP y traduce. A ese adaptador traductor se le llama **capa anticorrupción** (*anti-corruption layer*, término de DDD). Si en una reunión alguien lo menciona, ya sabes que es esto.
+> 💡 **Tip — vocabulario útil en SEIDEL, que mantiene sistemas legacy SOAP/XML:** el lenguaje de "puertos y adaptadores" brilla cuando hay **sistemas legacy**. Un servicio SOAP de hace 15 años que devuelve XML con nombres de campo en mayúsculas y fechas como texto no debería contaminar tu dominio. Se define un puerto limpio en Application (`IRegistroMaritimoClient` que devuelve un `record` tuyo) y un adaptador en Infrastructure que habla SOAP y traduce. A ese adaptador traductor se le llama **capa anticorrupción** (*anti-corruption layer*, término de DDD). Si en una reunión alguien lo menciona, ya sabes que es esto.
 
 ```csharp
 // Application — el puerto: lo que el negocio NECESITA, en sus propios términos
@@ -3310,6 +3310,8 @@ internal sealed class BarcoRepository : IBarcoRepository    // internal: nadie f
 > 💡 **Tip:** ¿las interfaces de repositorio en Domain o en Application? Las dos escuelas existen. Las plantillas de Clean Architecture más populares en .NET (Jason Taylor, Ardalis) ponen las abstracciones de persistencia en Application o en un proyecto `Core`; DDD clásico las pone en Domain, junto a las entidades que manejan. Ambas cumplen la regla de dependencia. Lo importante es que **nunca** estén en Infrastructure.
 
 ### Cambiar de proveedor de base de datos sin tocar Application
+
+Este caso te toca de cerca: MarinaApi usa SQL Server, y en SEIDEL se trabaja con MySQL y PostgreSQL.
 
 Con esta estructura, pasar de SQL Server a PostgreSQL o MySQL afecta a **un solo proyecto**:
 
@@ -3630,7 +3632,7 @@ public static class AsignarBarco
 
 > ⚠️ **Cuidado:** MediatR (y AutoMapper, del mismo autor) pasaron en 2025 a un **modelo de licencia comercial** para empresas a partir de ciertas versiones. En un proyecto heredado las verás en versiones antiguas y gratuitas; en uno nuevo, el equipo tendrá que decidir si paga licencia, usa alternativas (Mediator de martinothamar, Wolverine) o simplemente inyecta los handlers por DI sin mediador. No añadas ninguna de las dos a un proyecto de la empresa sin preguntar.
 
-> 💡 **Tip:** **no hace falta aplicar esto a MarinaApi.** El objetivo es que, si abres un repositorio de SEIDEL y ves una carpeta `Features/` con `Commands/` y `Queries/`, sepas en diez segundos qué estás mirando y dónde buscar cada cosa. Y que no son excluyentes: muchos proyectos usan capas (Domain/Infrastructure como proyectos) y slices dentro de Application.
+> 💡 **Tip:** **no hace falta aplicar esto a MarinaApi.** El objetivo es que, si en las prácticas abres un repositorio y ves una carpeta `Features/` con `Commands/` y `Queries/`, sepas en diez segundos qué estás mirando y dónde buscar cada cosa. Y que no son excluyentes: muchos proyectos usan capas (Domain/Infrastructure como proyectos) y slices dentro de Application.
 
 ---
 
@@ -4406,7 +4408,7 @@ app.UseSwaggerUI(o =>
 
 > 💡 **Tip — la regla de oro de versionado en la empresa:** una nueva versión **no sustituye a la anterior, convive con ella**. El ciclo típico es: publicar v2 → marcar v1 como `Deprecated = true` (los clientes reciben la cabecera `api-deprecated-versions`) → comunicar una fecha de retirada → medir en los logs quién sigue llamando a v1 → retirarla. Si los logs no permiten saber qué versión llama cada cliente, no puedes retirar nunca nada.
 
-> 💡 **Tip — sistemas SOAP legacy:** en SOAP/WSDL el versionado se hace típicamente con el *namespace* XML (`http://seidel.example/registro/v2`) o publicando un endpoint nuevo (`/RegistroService_v2.svc`). Si una tarea te pide "tocar el servicio viejo", pregunta antes qué clientes lo consumen: la tolerancia a cambios de un cliente SOAP generado con `wsimport` hace diez años es prácticamente nula (un elemento nuevo en la respuesta puede romper la deserialización).
+> 💡 **Tip — sistemas SOAP legacy:** en SOAP/WSDL el versionado se hace típicamente con el *namespace* XML (`http://ejemplo.org/registro/v2`) o publicando un endpoint nuevo (`/RegistroService_v2.svc`). Si una tarea te pide "tocar el servicio viejo", pregunta antes qué clientes lo consumen: la tolerancia a cambios de un cliente SOAP generado con `wsimport` hace diez años es prácticamente nula (un elemento nuevo en la respuesta puede romper la deserialización).
 
 > ⚠️ **Cuidado:** con versión en la URL, `AssumeDefaultVersionWhenUnspecified` **no** hace que `/api/barcos` funcione: esa ruta simplemente no existe, porque la plantilla exige `v{version}`. Si tienes clientes que ya llaman sin versión, añade una segunda ruta `[Route("api/[controller]")]` en los controladores de v1 durante la transición.
 
@@ -5028,7 +5030,7 @@ public class LibroRepositorioTests : IClassFixture<BaseDatosFixture>
 
 > ⚠️ **Cuidado con la cobertura como métrica:** un 90% de cobertura con tests que no comprueban nada útil vale menos que un 50% bien elegido. La cobertura dice qué líneas se ejecutaron, no si el comportamiento es correcto.
 
-**Por qué importa en Espiral MS:** en muchos equipos, un pull request sin tests no se aprueba. Y cuando entres a un proyecto que no conoces, **leer sus tests es la forma más rápida de entender qué hace el sistema**: son documentación ejecutable que, a diferencia de la escrita, no puede quedarse obsoleta sin que nadie se entere.
+**Por qué importa en la empresa:** en muchos equipos, un pull request sin tests no se aprueba. Y cuando entres a un proyecto que no conoces, **leer sus tests es la forma más rápida de entender qué hace el sistema**: son documentación ejecutable que, a diferencia de la escrita, no puede quedarse obsoleta sin que nadie se entere.
 
 ---
 
@@ -5146,7 +5148,7 @@ Con la segunda forma, el sistema de logs guarda **el mensaje y el dato por separ
   "Biblioteca": {
     "DiasPrestamo": 15,
     "MaxLibrosPorUsuario": 3,
-    "EmailNotificaciones": "biblioteca@espiralms.com"
+    "EmailNotificaciones": "biblioteca@ejemplo.com"
   }
 }
 ```
@@ -5247,7 +5249,7 @@ app.Logger.LogInformation("Aplicación iniciada en entorno {Entorno}", app.Envir
 app.Run();
 ```
 
-**Por qué importa en Espiral MS:** el primer día, cuando clones el repositorio y la aplicación no arranque, el 90% de las veces será por configuración — una cadena de conexión que apunta a una base de datos que no tienes, o un secreto que debes pedir a un compañero porque (correctamente) no está en Git. Saber dónde mirar (`appsettings.json`, `appsettings.Development.json`, variables de entorno, user secrets, y en ese orden de prioridad) te ahorra la primera mañana entera.
+**Por qué importa en la empresa:** el primer día, cuando clones el repositorio y la aplicación no arranque, el 90% de las veces será por configuración — una cadena de conexión que apunta a una base de datos que no tienes, o un secreto que debes pedir a un compañero porque (correctamente) no está en Git. Saber dónde mirar (`appsettings.json`, `appsettings.Development.json`, variables de entorno, user secrets, y en ese orden de prioridad) te ahorra la primera mañana entera.
 
 ---
 
@@ -5537,7 +5539,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ## 17.4 El ciclo de un Sprint
 
-Un sprint dura típicamente **1-2 semanas** (2 semanas es lo más común en entornos empresariales, incluido probablemente Espiral MS).
+Un sprint dura típicamente **1-2 semanas** (2 semanas es lo más común en entornos empresariales).
 
 ### Sprint Planning (inicio del sprint)
 
@@ -5677,9 +5679,9 @@ El equipo mueve las tarjetas de izquierda a derecha durante el sprint. Un vistaz
 
 ---
 
-## 17.8 Qué esperar en Espiral MS
+## 17.8 Qué esperar en unas prácticas
 
-Con alta probabilidad, en las prácticas:
+Lo más habitual en equipos de desarrollo (confirma los detalles con tu equipo el primer día):
 - Sprints de 2 semanas, con Jira o Azure DevOps para el backlog
 - Daily standup a primera hora de la mañana
 - Sprint Planning el primer día del sprint, Review/Retro el último
@@ -5999,7 +6001,7 @@ function sumar(a: number, b: number): number {
 sumar("5", 3); // Error de compilación: string no asignable a number
 ```
 
-**Por qué importa en Espiral MS:** si el frontend usa Angular o un stack TypeScript, esta detección temprana de errores ahorra muchísimo tiempo de debugging comparado con JavaScript puro.
+**Por qué importa en la empresa:** si el frontend usa Angular o un stack TypeScript, esta detección temprana de errores ahorra muchísimo tiempo de debugging comparado con JavaScript puro.
 
 ---
 
@@ -6227,4 +6229,4 @@ Y una última cosa que no cabe en ninguna lección: **en unas prácticas no se e
 
 **Fin de la Guía Definitiva**
 
-¡Mucho éxito en Espiral MS! 
+¡Mucho éxito en SEIDEL! 
