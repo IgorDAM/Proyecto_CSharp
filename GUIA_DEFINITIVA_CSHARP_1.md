@@ -17,13 +17,16 @@
 10. [[#Lección 8: Entity Framework Core|Lección 8: Entity Framework]]
 11. [[#Lección 9: Records y Pattern Matching|Lección 9: Records y Pattern Matching]]
 12. [[#Lección 10: ASP.NET Core Web API|Lección 10: ASP.NET Core Web API]]
-13. [[#Lección 11: Testing con xUnit y Moq|Lección 11: Testing]]
-14. [[#Lección 12: Logging y Configuración en .NET|Lección 12: Logging y Configuración]]
-15. [[#Lección 13: Git Avanzado|Lección 13: Git]]
-16. [[#Lección 14: Scrum y Agile|Lección 14: Scrum]]
-17. [[#Lección 15: Frontend]]
-18. [[#Lección 16: TypeScript]]
-19. [[#Resumen Final]]
+13. [[#Lección 11: Arquitectura de backend en capas|Lección 11: Arquitectura de backend]]
+14. [[#Lección 12: Modelado del dominio, errores y validación|Lección 12: Dominio, errores y validación]]
+15. [[#Lección 13: API lista para producción|Lección 13: API lista para producción]]
+16. [[#Lección 14: Testing con xUnit y Moq|Lección 14: Testing]]
+17. [[#Lección 15: Logging y Configuración en .NET|Lección 15: Logging y Configuración]]
+18. [[#Lección 16: Git Avanzado|Lección 16: Git]]
+19. [[#Lección 17: Scrum y Agile|Lección 17: Scrum]]
+20. [[#Lección 18: Frontend]]
+21. [[#Lección 19: TypeScript]]
+22. [[#Resumen Final]]
 
 ---
 
@@ -48,13 +51,14 @@ Bienvenido a tu plan de capacitación en C# para las prácticas de DAM en Espira
 - Escribir código idiomático en C# (LINQ, async/await, records, pattern matching)
 - Entender patrones empresariales (Repository, Dependency Injection, Strategy, Decorator)
 - Construir y testear una API real con ASP.NET Core y Entity Framework Core
+- Estructurar un backend robusto: arquitectura en capas, Unit of Work, modelo de dominio rico, Result pattern, versionado, health checks y resiliencia
 - Manejarte en el entorno de trabajo: Git en equipo, Scrum, logs y configuración
 
 **Estructura del aprendizaje:**
 - Semanas 1-2: Fundamentos de C# (sintaxis, colecciones, async)
 - Semana 2: Proyecto integrador (juntar todo en algo real)
 - Semana 3: Profundización (generics, delegates, patrones, records y pattern matching)
-- Semana 4: El stack de la empresa (Web API, testing, logging y configuración) + entorno de equipo (Git, Scrum, frontend)
+- Semana 4: El stack de la empresa (Web API, arquitectura de backend, testing, logging y configuración) + entorno de equipo (Git, Scrum, frontend)
 
 ---
 
@@ -1464,7 +1468,7 @@ builder.Services.AddScoped<GestorPrestamos>();
 
 Esto automatiza exactamente lo que hicimos a mano arriba: cuando algo pida un `ILibroRepositorio`, el framework crea automáticamente un `BibliotecaRepositorio` y lo inyecta.
 
-> ⚠️ **Cuidado — *captive dependency*, el bug de DI que más cuesta encontrar:** si un servicio **Singleton** recibe por constructor un servicio **Scoped** (por ejemplo un `DbContext`), ese `DbContext` queda "atrapado" y vive para siempre, compartido entre todas las peticiones de todos los usuarios. Resultado: datos de un usuario que aparecen en la sesión de otro, o un `ObjectDisposedException` aleatorio. **Regla mental: un servicio nunca debe depender de otro con un ciclo de vida más corto que el suyo.** En .NET moderno, `builder.Build()` en desarrollo detecta muchos de estos casos y falla al arrancar — no desactives esa validación.
+> ⚠️ **Cuidado — *captive dependency*, el bug de DI que más cuesta encontrar:** si un servicio **Singleton** recibe por constructor un servicio **Scoped** (por ejemplo un `DbContext`), ese `DbContext` queda "atrapado" y vive para siempre, compartido entre todas las peticiones de todos los usuarios. Resultado: datos de un usuario que aparecen en la sesión de otro, o un `ObjectDisposedException` aleatorio. **Regla mental: un servicio nunca debe depender de otro con un ciclo de vida más corto que el suyo.** En .NET moderno, `builder.Build()` en desarrollo detecta muchos de estos casos y falla al arrancar — no desactives esa validación. Síntomas, detección y las tres formas de arreglarlo: [[#11.5 Captive dependency en profundidad|Lección 11.5]].
 
 > 💡 **Tip:** ¿cuál elegir cuando dudas? `AddScoped` es el valor por defecto sensato para casi todo (servicios, repositorios, `DbContext`). `AddSingleton` solo para cosas realmente sin estado o inmutables (configuración, cachés pensadas para ser compartidas, clientes HTTP). `AddTransient` para objetos muy ligeros y de usar y tirar. Ante la duda: Scoped.
 
@@ -1662,7 +1666,7 @@ Sigue siendo el mismo patrón (interfaz + implementación de test intercambiable
 
 ---
 
-Esta lección te da el patrón; la [[#Lección 11: Testing con xUnit y Moq|Lección 11]] te da el marco de tests completo donde encaja.
+Esta lección te da el patrón; la [[#Lección 14: Testing con xUnit y Moq|Lección 14]] te da el marco de tests completo donde encaja.
 
 ---
 
@@ -2480,7 +2484,7 @@ Console.WriteLine(original.Anio);   // 1949 — el original NO se toca
 Console.WriteLine(reedicion.Anio);  // 2024
 ```
 
-Esto se llama *non-destructive mutation* y es el equivalente conceptual del spread de JavaScript (`{ ...persona, edad: 30 }`, que verás en la Lección 15).
+Esto se llama *non-destructive mutation* y es el equivalente conceptual del spread de JavaScript (`{ ...persona, edad: 30 }`, que verás en la Lección 18).
 
 ### Cuándo usar `record` y cuándo `class`
 
@@ -2677,7 +2681,7 @@ MiApi/
 └── Dtos/                   ← lo que entra y sale por HTTP
 ```
 
-Esta separación en capas no es burocracia: **el controlador no sabe de base de datos, y el repositorio no sabe de HTTP**. Cada capa se puede testear sola.
+Esta separación en capas no es burocracia: **el controlador no sabe de base de datos, y el repositorio no sabe de HTTP**. Cada capa se puede testear sola. Cómo escala esta estructura a proyectos separados, y qué significan Clean, Onion y Hexagonal, está en la [[#Lección 11: Arquitectura de backend en capas|Lección 11]].
 
 ---
 
@@ -2866,6 +2870,8 @@ Con `[ApiController]` en el controlador, la validación es **automática**: si e
 }
 ```
 
+> 💡 **Tip:** las Data Annotations bastan para reglas simples. Para reglas entre campos, condicionales o testeables por separado, la alternativa habitual es FluentValidation ([[#12.4 Dónde vive la validación: FluentValidation|Lección 12.4]]).
+
 > 💡 **Tip:** `ProblemDetails` es el formato estándar de errores de las APIs .NET modernas. Si devuelves tus propios errores con ese mismo formato (`Problem(...)`, `ValidationProblem(...)`), todos los errores de tu API serán consistentes y cualquier cliente sabrá interpretarlos.
 
 ---
@@ -2922,6 +2928,8 @@ app.UseMiddleware<MiddlewareDeErrores>();
 ```
 
 > ⚠️ **Cuidado:** nunca devuelvas `ex.ToString()` ni el stack trace en la respuesta HTTP de producción. Revela rutas de archivos, nombres de clases internas y versiones de librerías: es información de oro para quien quiera atacar el sistema. El detalle va **al log**; al cliente solo un mensaje genérico y, como mucho, un identificador de correlación para poder buscarlo.
+
+> 💡 **Tip:** desde .NET 8 existe una alternativa integrada a este middleware (`IExceptionHandler` + `AddProblemDetails`), y para los errores *esperados* (como un 409) muchos equipos prefieren no usar excepciones. Ambas cosas en las [[#13.3 Errores globales en .NET 8: IExceptionHandler y ProblemDetails|Lecciones 13.3]] y [[#12.3 Result pattern: errores esperados sin excepciones|12.3]].
 
 ---
 
@@ -2986,7 +2994,1863 @@ Esos atributos hacen que Swagger muestre exactamente qué devuelve cada endpoint
 
 ---
 
-# Lección 11: Testing con xUnit y Moq
+# Lección 11: Arquitectura de backend en capas
+
+[[#Índice|↑ Volver al índice]]
+
+En la Lección 10 construiste una API que funciona. Esta lección y las dos siguientes van de otra cosa: de que **siga funcionando** cuando tenga 200 endpoints, cinco desarrolladores tocándola a la vez, tres años en producción y un cliente que pide cambiar de SQL Server a PostgreSQL. Es lo que separa "sé hacer un CRUD" de "sé trabajar en el backend de una consultora".
+
+El orden es deliberado:
+- **Lección 11 (esta):** cómo se organiza el código — capas, proyectos, vocabulario de arquitecturas y DI a fondo.
+- **Lección 12:** qué va *dentro* de esas capas — Unit of Work, modelo de dominio rico, Result pattern y validación.
+- **Lección 13:** lo que rodea a la API en producción — versionado, health checks, errores globales, resiliencia y tareas en segundo plano.
+
+> 🧠 **Mentalidad Java → C#:** en Spring la arquitectura "te viene dada" por las anotaciones: `@RestController`, `@Service`, `@Repository` y el escaneo de componentes hacen que todo el mundo acabe con la misma estructura sin pensarlo. En .NET no hay escaneo automático ni estereotipos: registras cada pieza a mano en `Program.cs` y decides tú dónde vive cada cosa. Eso da más libertad y, por tanto, más formas de hacerlo mal. Esta lección es el criterio que Spring te daba gratis.
+
+---
+
+## 11.1 Las cuatro capas y la regla de dependencia
+
+Un backend .NET "de libro" se organiza en cuatro capas:
+
+```
+┌───────────────────────────────────────────────────────────┐
+│  Presentation (Api)        Controllers, Middleware, DTOs  │  ← habla HTTP
+├───────────────────────────────────────────────────────────┤
+│  Application               Services / casos de uso,       │  ← orquesta
+│                            validadores, interfaces de     │
+│                            servicios externos             │
+├───────────────────────────────────────────────────────────┤
+│  Domain                    Entidades, value objects,      │  ← las reglas
+│                            interfaces de repositorio,     │     del negocio
+│                            excepciones/errores de dominio │
+├───────────────────────────────────────────────────────────┤
+│  Infrastructure            DbContext, Repositories EF,    │  ← habla con
+│                            clientes HTTP/SOAP, email...   │     el mundo
+└───────────────────────────────────────────────────────────┘
+```
+
+Y la regla que da sentido a todo, la **regla de dependencia**:
+
+```
+Api ──────────► Application ──────────► Domain
+                                           ▲
+Infrastructure ────────────────────────────┘
+      (implementa las interfaces que define Domain / Application)
+```
+
+**Domain no depende de nadie.** No sabe qué es HTTP, ni EF Core, ni SQL Server. Infrastructure depende de Domain (implementa sus interfaces), no al revés. Esto es la *inversión de dependencias* (la "D" de SOLID) aplicada a nivel de arquitectura, no solo de clase.
+
+La equivalencia con Spring es casi uno a uno:
+
+| Capa .NET | Qué contiene | Equivalente Spring |
+|---|---|---|
+| Presentation / Api | `[ApiController]`, middleware, filtros, DTOs HTTP | `@RestController`, `@ControllerAdvice`, filtros |
+| Application | Servicios de caso de uso, validadores, puertos | `@Service` |
+| Domain | Entidades, value objects, interfaces de repositorio | `@Entity` (aunque en Spring suele estar mezclado con JPA) |
+| Infrastructure | `DbContext`, repositorios EF, clientes externos | `@Repository`, `JpaRepository`, `RestTemplate`/`WebClient` |
+
+**Cómo se ve una petición atravesando las capas** (el caso real de MarinaApi: asignar un barco a un amarre):
+
+```
+PUT /api/amarres/3/barco  { "barcoId": 5 }
+  │
+  ▼ Api            AmarresController.AssignBarco()        → traduce HTTP ↔ DTO
+  ▼ Application    AmarreService.AssignBarcoAsync()       → orquesta: busca, comprueba, decide
+  ▼ Domain         amarre.AsignarBarco(5)                 → aplica la regla de negocio
+  ▼ Infrastructure AmarreRepository + MarinaDbContext     → persiste en SQL Server
+```
+
+> 💡 **Tip:** una forma rápida de saber en qué capa va algo es preguntarte **"¿esto cambiaría si mañana la API fuera gRPC en vez de REST?"** Si sí → Api. **"¿Y si cambiáramos de base de datos?"** Si sí → Infrastructure. **"¿Y si cambiara la ley o el negocio?"** Si sí → Domain. Lo que coordina varias de esas cosas sin ser ninguna → Application.
+
+> ⚠️ **Cuidado:** MarinaApi, como la mayoría de proyectos de aprendizaje, está organizado **por carpetas** en un solo proyecto (`Controllers/`, `Services/`, `Repositories/`, `Models/`). Eso es N-Tier "por convención": nada impide que un controlador use `MarinaDbContext` directamente o que una entidad referencie algo de ASP.NET. Funciona mientras el equipo sea disciplinado. La siguiente sección explica cómo hacer que lo impida el compilador.
+
+---
+
+## 11.2 De carpetas a proyectos: Clean Architecture por assembly
+
+En .NET es muy habitual —mucho más que en el mundo Spring— que cada capa sea **un proyecto `.csproj` distinto** dentro de la misma solución (`.sln`). Cada proyecto compila a su propio *assembly* (`.dll`), y las referencias entre proyectos se declaran explícitamente.
+
+```bash
+dotnet new sln -n Marina
+
+dotnet new classlib -n Marina.Domain
+dotnet new classlib -n Marina.Application
+dotnet new classlib -n Marina.Infrastructure
+dotnet new webapi   -n Marina.Api
+dotnet new xunit    -n Marina.Tests
+
+dotnet sln add Marina.Domain/Marina.Domain.csproj Marina.Application/Marina.Application.csproj \
+               Marina.Infrastructure/Marina.Infrastructure.csproj Marina.Api/Marina.Api.csproj \
+               Marina.Tests/Marina.Tests.csproj
+
+# Las flechas de la regla de dependencia, convertidas en referencias reales
+dotnet add Marina.Application/Marina.Application.csproj       reference Marina.Domain/Marina.Domain.csproj
+dotnet add Marina.Infrastructure/Marina.Infrastructure.csproj reference Marina.Application/Marina.Application.csproj
+dotnet add Marina.Api/Marina.Api.csproj                       reference Marina.Application/Marina.Application.csproj
+dotnet add Marina.Api/Marina.Api.csproj                       reference Marina.Infrastructure/Marina.Infrastructure.csproj
+
+# Los paquetes, cada uno SOLO donde toca
+dotnet add Marina.Infrastructure/Marina.Infrastructure.csproj package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add Marina.Application/Marina.Application.csproj       package FluentValidation
+```
+
+```
+Marina.sln
+├── Marina.Domain/            ← 0 paquetes NuGet. Solo C#.
+│   ├── Entities/             Barco.cs, Amarre.cs
+│   ├── ValueObjects/         Eslora.cs
+│   ├── Repositories/         IBarcoRepository.cs, IAmarreRepository.cs, IUnitOfWork.cs
+│   └── Errors/               ErroresAmarre.cs
+├── Marina.Application/       ← referencia Domain
+│   ├── Amarres/              AmarreService.cs, AsignarBarcoDto.cs, AsignarBarcoValidator.cs
+│   ├── Abstractions/         IRegistroMaritimoClient.cs (servicio externo)
+│   └── DependencyInjection.cs
+├── Marina.Infrastructure/    ← referencia Application (y Domain por transitividad)
+│   ├── Persistence/          MarinaDbContext.cs, Configurations/, Migrations/
+│   ├── Repositories/         BarcoRepository.cs, AmarreRepository.cs
+│   ├── External/             RegistroMaritimoSoapClient.cs
+│   └── DependencyInjection.cs
+├── Marina.Api/               ← referencia Application e Infrastructure
+│   ├── Controllers/
+│   ├── Middleware/
+│   └── Program.cs
+└── Marina.Tests/             ← referencia lo que vaya a testear
+```
+
+**La ventaja no es estética, es que el compilador vigila la arquitectura:** como `Marina.Domain` no tiene referencia a EF Core, es *literalmente imposible* escribir `using Microsoft.EntityFrameworkCore;` en una entidad. Como `Marina.Application` no referencia `Marina.Infrastructure`, un servicio no puede instanciar `MarinaDbContext` aunque quiera. La regla de dependencia deja de ser una recomendación del README y pasa a ser un error de compilación.
+
+> 🧠 **Mentalidad Java → C#:** el equivalente en Java es un proyecto **Maven/Gradle multi-módulo** (`marina-domain`, `marina-application`...). Existe, pero en Spring Boot es poco habitual para proyectos medianos: casi todo el mundo usa un único módulo con paquetes, y como en Java la visibilidad por paquete es débil, se recurre a ArchUnit para vigilar dependencias. En .NET, crear varios `.csproj` es tan barato (un comando, y Visual Studio/Rider los gestionan de forma nativa) que es la opción por defecto en cuanto el proyecto pasa de juguete. Si llegas a una solución de SEIDEL con 6-10 proyectos, no es sobreingeniería: es lo normal.
+
+### Cada capa registra sus propios servicios
+
+Para que `Program.cs` no se convierta en una lista de 80 `AddScoped`, cada proyecto expone un método de extensión con sus registros. Este patrón lo verás en prácticamente cualquier solución .NET con capas:
+
+```csharp
+// Marina.Infrastructure/DependencyInjection.cs
+namespace Marina.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        var cadena = configuration.GetConnectionString("MarinaDb")
+            ?? throw new InvalidOperationException("Falta la cadena de conexión 'MarinaDb'.");
+
+        services.AddDbContext<MarinaDbContext>(o => o.UseSqlServer(cadena));
+
+        services.AddScoped<IBarcoRepository, BarcoRepository>();
+        services.AddScoped<IAmarreRepository, AmarreRepository>();
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<MarinaDbContext>());
+
+        return services;
+    }
+}
+
+// Marina.Application/DependencyInjection.cs
+namespace Marina.Application;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplication(this IServiceCollection services)
+    {
+        services.AddScoped<IAmarreService, AmarreService>();
+        services.AddValidatorsFromAssembly(typeof(DependencyInjection).Assembly);
+        return services;
+    }
+}
+```
+
+```csharp
+// Marina.Api/Program.cs — el "composition root": el ÚNICO sitio que conoce todas las capas
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services
+    .AddApplication()
+    .AddInfrastructure(builder.Configuration);
+
+builder.Services.AddControllers();
+
+var app = builder.Build();
+app.MapControllers();
+app.Run();
+```
+
+> 💡 **Tip:** fíjate en que `Marina.Api` referencia `Marina.Infrastructure` **solo para poder llamar a `AddInfrastructure` en `Program.cs`**. Los controladores nunca deberían usar un tipo de Infrastructure. Si en code review ves `using Marina.Infrastructure.Persistence;` dentro de un controlador, es exactamente el tipo de comentario que se deja.
+
+> ⚠️ **Cuidado:** no confundas "muchos proyectos" con "buena arquitectura". Partir en 12 `.csproj` una API de 15 endpoints añade fricción (cada cambio toca 4 proyectos) sin beneficio. Para un proyecto pequeño, **carpetas + la disciplina de 11.6** es suficiente. El salto a proyectos separados compensa cuando hay varios desarrolladores, varios puntos de entrada (una API y un worker que comparten dominio) o una vida esperada de años.
+
+---
+
+## 11.3 N-Tier, Clean, Onion y Hexagonal: mismo patrón, distinto vocabulario
+
+En ofertas de empleo, en READMEs y en reuniones oirás estos cuatro nombres como si fueran cosas muy distintas. En la práctica, **las tres últimas son la misma idea con dibujos diferentes**, y la primera es su antecesora.
+
+| Nombre | Autor / época | Dibujo | Idea central | Vocabulario propio |
+|---|---|---|---|---|
+| **N-Tier / N-Layer** | Clásico, años 90-2000 | Pila de capas | Presentación → Negocio → Datos. **Las dependencias van hacia la base de datos.** | BLL, DAL, "capa de datos" |
+| **Hexagonal (Ports & Adapters)** | Alistair Cockburn, 2005 | Hexágono | La aplicación en el centro; el mundo exterior (HTTP, BD, colas) se conecta mediante *puertos* (interfaces) y *adaptadores* (implementaciones). | Puerto, adaptador, *driving*/*driven* |
+| **Onion** | Jeffrey Palermo, 2008 | Círculos concéntricos | Dominio en el centro; las dependencias apuntan siempre hacia dentro. | *Domain Model*, *Domain Services*, *Application Services* |
+| **Clean Architecture** | Robert C. Martin, 2012 | Círculos concéntricos | Igual que Onion, generalizado con la "regla de dependencia". | *Entities*, *Use Cases*, *Interface Adapters*, *Frameworks & Drivers* |
+
+**La única diferencia que importa de verdad** está entre N-Tier clásico y las otras tres:
+
+```
+N-Tier clásico:        Presentación → Negocio → Datos
+                       (Negocio referencia a Datos: el servicio usa directamente SqlConnection o el DbContext)
+
+Hexagonal/Onion/Clean: Presentación → Aplicación → Dominio ← Infraestructura
+                       (Dominio define la interfaz; Infraestructura la implementa — dependencia INVERTIDA)
+```
+
+En N-Tier puro, la lógica de negocio depende de la capa de datos, así que no puedes testearla sin base de datos ni cambiar de proveedor sin tocarla. En las otras tres, el negocio define *qué necesita* (`IBarcoRepository`) y la infraestructura se adapta. Todo lo demás (cuántos círculos, cómo se llaman, si el hexágono tiene seis lados por algo) es presentación.
+
+**Traducción entre vocabularios**, para cuando alguien use el que no es el tuyo:
+
+| Lo que tú ya conoces | Hexagonal lo llama | Clean lo llama |
+|---|---|---|
+| `IBarcoRepository` (interfaz) | Puerto de salida (*driven port*) | *Gateway* / interfaz de repositorio |
+| `BarcoRepository` (EF Core) | Adaptador de salida (*driven adapter*) | *Interface Adapter* / *Framework & Driver* |
+| `AmarresController` | Adaptador de entrada (*driving adapter*) | *Controller* (*Interface Adapter*) |
+| `IAmarreService` | Puerto de entrada (*driving port*) | *Input Boundary* / *Use Case* |
+| `AmarreService` | Núcleo de la aplicación | *Use Case Interactor* |
+
+> 💡 **Tip — vocabulario útil en SEIDEL:** el lenguaje de "puertos y adaptadores" brilla cuando hay **sistemas legacy**. Un servicio SOAP de hace 15 años que devuelve XML con nombres de campo en mayúsculas y fechas como texto no debería contaminar tu dominio. Se define un puerto limpio en Application (`IRegistroMaritimoClient` que devuelve un `record` tuyo) y un adaptador en Infrastructure que habla SOAP y traduce. A ese adaptador traductor se le llama **capa anticorrupción** (*anti-corruption layer*, término de DDD). Si en una reunión alguien lo menciona, ya sabes que es esto.
+
+```csharp
+// Application — el puerto: lo que el negocio NECESITA, en sus propios términos
+public interface IRegistroMaritimoClient
+{
+    Task<MatriculaOficial?> ConsultarMatriculaAsync(string matricula, CancellationToken ct);
+}
+
+public record MatriculaOficial(string Matricula, string Armador, DateOnly FechaAlta, bool Activa);
+
+// Infrastructure — el adaptador: sabe de SOAP, XML y las rarezas del sistema viejo
+public class RegistroMaritimoSoapClient : IRegistroMaritimoClient
+{
+    private readonly RegistroMaritimoPortTypeClient _soap;   // proxy generado con dotnet-svcutil
+
+    public RegistroMaritimoSoapClient(RegistroMaritimoPortTypeClient soap) => _soap = soap;
+
+    public async Task<MatriculaOficial?> ConsultarMatriculaAsync(string matricula, CancellationToken ct)
+    {
+        var respuesta = await _soap.CONSULTA_MATRICULAAsync(new CONSULTA_MATRICULA_REQ { MATRICULA = matricula.ToUpperInvariant() });
+
+        if (respuesta.COD_RETORNO == "NE")           // "No Existe", según la documentación de 2009
+            return null;
+
+        return new MatriculaOficial(
+            respuesta.MATRICULA.Trim(),
+            respuesta.NOMBRE_ARMADOR.Trim(),
+            DateOnly.ParseExact(respuesta.F_ALTA, "yyyyMMdd"),
+            respuesta.IND_ACTIVA == "S");
+    }
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** en Java el cliente SOAP se genera con `wsimport`/JAX-WS o con `jaxws-maven-plugin`; en .NET moderno se usa **`dotnet-svcutil`** (paquete `System.ServiceModel.*`) para *consumir* servicios SOAP, y **CoreWCF** si hay que *exponerlos*. El patrón de envolverlo tras una interfaz es idéntico en los dos mundos.
+
+> ⚠️ **Cuidado:** no te pelees por el nombre. Si el equipo dice "esto es Clean Architecture" y tú ves algo que es claramente Onion, dale igual: la conversación útil no es cómo se llama, sino **si el dominio depende de la infraestructura o no**. Esa es la única pregunta que distingue una arquitectura mantenible de una que no lo es.
+
+---
+
+## 11.4 Interfaces en Domain, implementación en Infrastructure
+
+Ya viste en la Lección 6 que el patrón Repository abstrae el acceso a datos. Aquí se trata de **dónde** vive cada pieza, y de qué se gana exactamente.
+
+```csharp
+// ─── Marina.Domain/Repositories/IBarcoRepository.cs ───
+// Sin "using Microsoft.EntityFrameworkCore": Domain no sabe que existe EF.
+namespace Marina.Domain.Repositories;
+
+public interface IBarcoRepository
+{
+    Task<Barco?> ObtenerPorIdAsync(long id, CancellationToken ct = default);
+    Task<Barco?> ObtenerPorMatriculaAsync(string matricula, CancellationToken ct = default);
+    Task<IReadOnlyList<Barco>> ObtenerSinAmarreAsync(CancellationToken ct = default);
+    Task<bool> ExisteAsync(long id, CancellationToken ct = default);
+    void Agregar(Barco barco);          // síncrono y sin guardar: guardar es trabajo del Unit of Work (Lección 12.1)
+    void Eliminar(Barco barco);
+}
+```
+
+```csharp
+// ─── Marina.Infrastructure/Repositories/BarcoRepository.cs ───
+using Microsoft.EntityFrameworkCore;
+
+namespace Marina.Infrastructure.Repositories;
+
+internal sealed class BarcoRepository : IBarcoRepository    // internal: nadie fuera de Infrastructure la ve
+{
+    private readonly MarinaDbContext _db;
+
+    public BarcoRepository(MarinaDbContext db) => _db = db;
+
+    public Task<Barco?> ObtenerPorIdAsync(long id, CancellationToken ct = default) =>
+        _db.Barcos.FirstOrDefaultAsync(b => b.Id == id, ct);
+
+    public Task<Barco?> ObtenerPorMatriculaAsync(string matricula, CancellationToken ct = default) =>
+        _db.Barcos.FirstOrDefaultAsync(b => b.Matricula == matricula, ct);
+
+    public async Task<IReadOnlyList<Barco>> ObtenerSinAmarreAsync(CancellationToken ct = default) =>
+        await _db.Barcos.AsNoTracking().Where(b => b.Amarre == null).ToListAsync(ct);
+
+    public Task<bool> ExisteAsync(long id, CancellationToken ct = default) =>
+        _db.Barcos.AnyAsync(b => b.Id == id, ct);
+
+    public void Agregar(Barco barco) => _db.Barcos.Add(barco);
+    public void Eliminar(Barco barco) => _db.Barcos.Remove(barco);
+}
+```
+
+> 💡 **Tip:** marcar las implementaciones de Infrastructure como `internal` es un truco muy de .NET que no tiene equivalente limpio en Java (el *package-private* de Java no cruza paquetes). Con `internal`, la clase solo existe dentro de su assembly: el resto de la solución **solo puede** usar la interfaz. El registro en DI funciona igual porque `AddInfrastructure` está dentro del mismo assembly.
+
+> 💡 **Tip:** ¿las interfaces de repositorio en Domain o en Application? Las dos escuelas existen. Las plantillas de Clean Architecture más populares en .NET (Jason Taylor, Ardalis) ponen las abstracciones de persistencia en Application o en un proyecto `Core`; DDD clásico las pone en Domain, junto a las entidades que manejan. Ambas cumplen la regla de dependencia. Lo importante es que **nunca** estén en Infrastructure.
+
+### Cambiar de proveedor de base de datos sin tocar Application
+
+Con esta estructura, pasar de SQL Server a PostgreSQL o MySQL afecta a **un solo proyecto**:
+
+```csharp
+// Marina.Infrastructure/DependencyInjection.cs
+services.AddDbContext<MarinaDbContext>(o =>
+{
+    var proveedor = configuration["Database:Provider"];
+    var cadena    = configuration.GetConnectionString("MarinaDb")!;
+
+    _ = proveedor switch
+    {
+        "SqlServer"  => o.UseSqlServer(cadena),                                  // Microsoft.EntityFrameworkCore.SqlServer
+        "PostgreSQL" => o.UseNpgsql(cadena),                                     // Npgsql.EntityFrameworkCore.PostgreSQL
+        "MySQL"      => o.UseMySql(cadena, ServerVersion.AutoDetect(cadena)),    // Pomelo.EntityFrameworkCore.MySql
+        _ => throw new InvalidOperationException($"Proveedor de BD no soportado: {proveedor}")
+    };
+});
+```
+
+`AmarreService`, los controladores y los tests unitarios **no cambian ni una línea**, porque ninguno de ellos sabía qué base de datos había debajo.
+
+> 🧠 **Mentalidad Java → C#:** en Spring esto es cambiar el driver JDBC en el `pom.xml` y `spring.datasource.url` + `spring.jpa.database-platform` en `application.properties`. En EF Core el proveedor es un **paquete NuGet distinto con su propio método de extensión** (`UseSqlServer`, `UseNpgsql`, `UseMySql`). Ojo con MySQL: el proveedor más usado no es el de Oracle sino **Pomelo**, que es de la comunidad.
+
+> ⚠️ **Cuidado — "cambiar de proveedor sin tocar nada" es verdad para el código, no para la base de datos.** Lo que sí cambia y te morderá:
+> - **Las migraciones son específicas del proveedor.** Una migración generada para SQL Server contiene tipos como `nvarchar(max)` o `rowversion`. Si soportas dos proveedores a la vez, necesitas dos juegos de migraciones (en proyectos separados, con `MigrationsAssembly`).
+> - **Mayúsculas y minúsculas:** con la collation por defecto, SQL Server y MySQL comparan `"velero" == "Velero"` como iguales; PostgreSQL **no**. Un `Where(b => b.Tipo == tipo)` que funcionaba deja de encontrar resultados.
+> - **Concurrencia optimista:** el `[Timestamp] byte[] RowVersion` de la [[#Concurrencia optimista: dos usuarios editando lo mismo|Lección 8.8]] es un tipo nativo de SQL Server. En PostgreSQL se usa la columna de sistema `xmin` (con Npgsql, una propiedad `uint` marcada como row version) y en MySQL una columna `timestamp`.
+> - **SQL crudo** (`FromSqlRaw`, procedimientos almacenados) no es portable. Por eso conviene que viva solo en Infrastructure: al menos sabes dónde buscar.
+
+> ⚠️ **Cuidado — la abstracción que gotea:** si tu interfaz de repositorio devuelve `IQueryable<Barco>`, Application puede componer consultas LINQ que **EF traduce a SQL según el proveedor**. Parece cómodo, pero es una fuga: el servicio acaba escribiendo LINQ que funciona en SQL Server y lanza `InvalidOperationException: could not be translated` en otro proveedor (o en un mock en memoria). Devuelve `IReadOnlyList<T>`, `T?` o `bool`, y deja el LINQ-a-SQL dentro de Infrastructure.
+
+---
+
+## 11.5 Captive dependency en profundidad
+
+En la [[#6.3 Dependency Injection (DI)|Lección 6.3]] viste el aviso en una línea. Aquí va entero, porque es de los bugs que llegan a producción y tardan días en diagnosticarse.
+
+### El bug
+
+```csharp
+// Un servicio que cachea las tarifas de amarre para no consultar la BD en cada petición
+public class CacheTarifas : ICacheTarifas
+{
+    private readonly MarinaDbContext _db;                       // ← Scoped
+    private Dictionary<string, decimal>? _tarifas;
+
+    public CacheTarifas(MarinaDbContext db) => _db = db;
+
+    public async Task<decimal> ObtenerTarifaAsync(string zona)
+    {
+        _tarifas ??= await _db.Tarifas.ToDictionaryAsync(t => t.Zona, t => t.PrecioDia);
+        return _tarifas[zona];
+    }
+}
+
+// Program.cs
+builder.Services.AddDbContext<MarinaDbContext>(...);           // Scoped (por defecto)
+builder.Services.AddSingleton<ICacheTarifas, CacheTarifas>();  // Singleton "porque es una caché"
+```
+
+**Qué pasa:** el contenedor crea `CacheTarifas` **una vez** y le inyecta el `DbContext` del primer scope que lo pidió. Ese scope (la primera petición HTTP) termina, pero el Singleton sigue guardando la referencia: el `DbContext` queda **cautivo**, vivo para siempre y compartido por todas las peticiones de todos los usuarios.
+
+**Síntomas en producción** (y por qué cuesta tanto relacionarlos con la causa):
+
+| Síntoma | Por qué ocurre |
+|---|---|
+| `ObjectDisposedException: Cannot access a disposed context instance` aleatorio | El scope original terminó y dispuso el contexto; el Singleton lo sigue usando |
+| `InvalidOperationException: A second operation was started on this context instance before a previous operation completed` | Dos peticiones concurrentes usan el mismo `DbContext`, que **no es thread-safe** |
+| Datos "viejos" que no se refrescan | El change tracker del contexto cautivo devuelve entidades ya cargadas en vez de reconsultar |
+| Memoria que crece sin parar | El change tracker acumula entidades de miles de peticiones |
+| "En mi máquina funciona" | En local haces una petición cada vez; en producción hay concurrencia real |
+
+> 🧠 **Mentalidad Java → C#:** en Spring es muy difícil tropezar con esto con la base de datos, y por eso tu intuición no te va a avisar. El `EntityManager` que Spring inyecta con `@PersistenceContext` **no es el EntityManager real: es un proxy thread-safe** que en cada llamada delega en el de la transacción actual. Puedes inyectarlo alegremente en un `@Service` singleton. En .NET, el `DbContext` que recibes **es el objeto real**, sin proxy. El equivalente exacto del problema en Spring es inyectar un bean `@Scope("prototype")` o `@RequestScope` sin `proxyMode` en un singleton — y Spring lo resuelve con `ScopedProxyMode.TARGET_CLASS` u `ObjectProvider<T>`. .NET no tiene proxies de scope: la solución es de diseño.
+
+### Detectarlo
+
+**1. La validación del contenedor.** `WebApplication.CreateBuilder` activa `ValidateScopes` y `ValidateOnBuild` **solo en el entorno Development**. Con el código de arriba, al arrancar en local obtienes:
+
+```
+System.AggregateException: Some services are not able to be constructed
+  (Error while validating the service descriptor 'ServiceType: ICacheTarifas Lifetime: Singleton
+   ImplementationType: CacheTarifas': Cannot consume scoped service 'MarinaDbContext'
+   from singleton 'ICacheTarifas'.)
+```
+
+Si el equipo arranca en local con otro entorno (`ASPNETCORE_ENVIRONMENT=Local`, muy habitual), la validación **no se ejecuta**. Actívala siempre:
+
+```csharp
+builder.Host.UseDefaultServiceProvider(o =>
+{
+    o.ValidateScopes  = true;   // detecta resolver Scoped desde el proveedor raíz
+    o.ValidateOnBuild = true;   // construye el grafo entero al arrancar, no en la primera petición
+});
+```
+
+> 💡 **Tip:** `ValidateOnBuild` hace el arranque unos milisegundos más lento en apps grandes. Algunos equipos lo activan solo fuera de producción (`if (!builder.Environment.IsProduction())`). Lo que **no** debe pasar es que no esté activo en ningún entorno donde se ejecuten los tests de integración.
+
+**2. Un test que falla si alguien lo introduce.** `WebApplicationFactory` arranca la aplicación en entorno Development, así que construir el contenedor ya ejecuta la validación:
+
+```csharp
+public class ContenedorDiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly WebApplicationFactory<Program> _factory;
+
+    public ContenedorDiTests(WebApplicationFactory<Program> factory) => _factory = factory;
+
+    [Fact]
+    public void Contenedor_NoTieneDependenciasCautivas()
+    {
+        // Acceder a Services fuerza builder.Build() → ValidateOnBuild lanza si hay un Singleton→Scoped
+        var act = () => _factory.Services;
+        act.Should().NotThrow();
+    }
+}
+```
+
+> ⚠️ **Cuidado — lo que la validación NO detecta:**
+> - Un **Transient** capturado por un Singleton. No es un error para el contenedor, pero si ese Transient tiene estado o es `IDisposable`, tienes el mismo problema.
+> - Registros con **factoría** (`AddSingleton(sp => new CacheTarifas(sp.GetRequiredService<MarinaDbContext>()))`): `ValidateOnBuild` no puede mirar dentro de la lambda. `ValidateScopes` lo cazará en tiempo de ejecución, pero solo en la primera llamada.
+> - Un `HttpClient` de un *typed client* (Lección 13.4) guardado en un Singleton: pierde la rotación de conexiones del `IHttpClientFactory` y deja de respetar cambios de DNS.
+
+### Arreglarlo: tres soluciones, de más simple a más flexible
+
+**Solución 1 — Alinear los lifetimes.** Si no hay una razón real para que sea Singleton, que no lo sea. Es la correcta el 70% de las veces.
+
+```csharp
+builder.Services.AddScoped<ICacheTarifas, CacheTarifas>();
+```
+
+Pero entonces ya no es una caché (se recrea en cada petición). Si la caché es el objetivo, separa **el estado** (Singleton) del **acceso a datos** (Scoped):
+
+```csharp
+builder.Services.AddMemoryCache();                              // IMemoryCache es Singleton y thread-safe
+builder.Services.AddScoped<ICacheTarifas, CacheTarifas>();
+
+public class CacheTarifas : ICacheTarifas
+{
+    private readonly IMemoryCache _cache;                       // Singleton dentro de Scoped: ✅ correcto
+    private readonly MarinaDbContext _db;                       // Scoped dentro de Scoped: ✅ correcto
+
+    public CacheTarifas(IMemoryCache cache, MarinaDbContext db) { _cache = cache; _db = db; }
+
+    public async Task<decimal> ObtenerTarifaAsync(string zona, CancellationToken ct = default)
+    {
+        var tarifas = await _cache.GetOrCreateAsync("tarifas", async entrada =>
+        {
+            entrada.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10);
+            return await _db.Tarifas.AsNoTracking().ToDictionaryAsync(t => t.Zona, t => t.PrecioDia, ct);
+        });
+        return tarifas![zona];
+    }
+}
+```
+
+**Solución 2 — `IServiceScopeFactory`: crear un scope por operación.** Cuando el Singleton es obligatorio (un `BackgroundService`, un consumidor de colas, un `IHostedService`), crea un scope propio para cada unidad de trabajo:
+
+```csharp
+public class CacheTarifas : ICacheTarifas            // sigue siendo Singleton
+{
+    private readonly IServiceScopeFactory _scopeFactory;   // IServiceScopeFactory es Singleton: seguro
+    private Dictionary<string, decimal>? _tarifas;
+    private readonly SemaphoreSlim _candado = new(1, 1);
+
+    public CacheTarifas(IServiceScopeFactory scopeFactory) => _scopeFactory = scopeFactory;
+
+    public async Task<decimal> ObtenerTarifaAsync(string zona, CancellationToken ct = default)
+    {
+        if (_tarifas is null)
+        {
+            await _candado.WaitAsync(ct);              // un Singleton es concurrente: protege la carga
+            try
+            {
+                if (_tarifas is null)
+                {
+                    await using var scope = _scopeFactory.CreateAsyncScope();
+                    var db = scope.ServiceProvider.GetRequiredService<MarinaDbContext>();
+                    _tarifas = await db.Tarifas.AsNoTracking().ToDictionaryAsync(t => t.Zona, t => t.PrecioDia, ct);
+                }                                      // ← aquí se dispone el DbContext, como debe ser
+            }
+            finally { _candado.Release(); }
+        }
+        return _tarifas[zona];
+    }
+}
+```
+
+**Solución 3 — `IDbContextFactory<T>`: cuando lo único que necesitas es un `DbContext`.** Es la opción más limpia para Singletons que solo tocan EF Core, sin pasar por el Service Locator:
+
+```csharp
+builder.Services.AddDbContextFactory<MarinaDbContext>(o => o.UseSqlServer(cadena));
+
+public class CacheTarifas : ICacheTarifas
+{
+    private readonly IDbContextFactory<MarinaDbContext> _factory;
+
+    public CacheTarifas(IDbContextFactory<MarinaDbContext> factory) => _factory = factory;
+
+    private async Task<Dictionary<string, decimal>> CargarAsync(CancellationToken ct)
+    {
+        await using var db = await _factory.CreateDbContextAsync(ct);   // contexto nuevo, de vida corta
+        return await db.Tarifas.AsNoTracking().ToDictionaryAsync(t => t.Zona, t => t.PrecioDia, ct);
+    }
+}
+```
+
+> 💡 **Tip:** la tabla mental definitiva — **quién puede inyectar a quién**:
+>
+> | Consumidor ↓ / Dependencia → | Singleton | Scoped | Transient |
+> |---|---|---|---|
+> | **Singleton** | ✅ | ❌ cautiva | ⚠️ cautiva (no la detecta la validación) |
+> | **Scoped** | ✅ | ✅ | ✅ |
+> | **Transient** | ✅ | ✅ (vive lo que el scope) | ✅ |
+
+---
+
+## 11.6 Tests de arquitectura: que la regla no dependa de la buena voluntad
+
+Si trabajas con carpetas en un solo proyecto (como MarinaApi), o quieres reglas más finas que las referencias entre proyectos ("los controladores no usan repositorios directamente", "todo lo que acaba en `Repository` es `internal`"), puedes **testear la arquitectura** con **NetArchTest.Rules** o **ArchUnitNET**:
+
+```bash
+dotnet add Marina.Tests package NetArchTest.Rules
+```
+
+```csharp
+public class ArquitecturaTests
+{
+    private static readonly Assembly Api = typeof(Program).Assembly;
+
+    [Fact]
+    public void Controladores_NoDependenDeRepositoriosNiDbContext()
+    {
+        var resultado = Types.InAssembly(Api)
+            .That().ResideInNamespace("MarinaApi.Controllers")
+            .ShouldNot().HaveDependencyOnAny("MarinaApi.Repositories", "MarinaApi.Data")
+            .GetResult();
+
+        resultado.IsSuccessful.Should().BeTrue(
+            "los controladores deben pasar por Services; infractores: {0}",
+            string.Join(", ", resultado.FailingTypeNames ?? []));
+    }
+
+    [Fact]
+    public void Modelos_NoDependenDeAspNetCore()
+    {
+        var resultado = Types.InAssembly(Api)
+            .That().ResideInNamespace("MarinaApi.Models")
+            .ShouldNot().HaveDependencyOn("Microsoft.AspNetCore")
+            .GetResult();
+
+        resultado.IsSuccessful.Should().BeTrue();
+    }
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** es exactamente **ArchUnit** de Java (de hecho ArchUnitNET es un port directo). Si ya lo has usado, la sintaxis fluida te resultará familiar.
+
+---
+
+## 11.7 Vertical Slice Architecture y feature folders
+
+Todo lo anterior organiza el código **por capa técnica**: todos los controladores juntos, todos los servicios juntos. Hay una alternativa que te encontrarás en otros proyectos .NET modernos: organizarlo **por funcionalidad**.
+
+```
+Organización por capas (MarinaApi)          Vertical Slice / feature folders
+─────────────────────────────────           ────────────────────────────────
+Controllers/                                Features/
+  AmarresController.cs                        Amarres/
+  BarcosController.cs                           AsignarBarco/
+Services/                                         AsignarBarcoEndpoint.cs
+  AmarreService.cs                                AsignarBarcoCommand.cs
+  BarcoService.cs                                 AsignarBarcoHandler.cs
+Repositories/                                     AsignarBarcoValidator.cs
+  AmarreRepository.cs                           ListarLibres/
+  BarcoRepository.cs                              ListarLibresEndpoint.cs
+Dtos/                                             ListarLibresQuery.cs
+  AmarreDtos.cs                               Barcos/
+  BarcoDtos.cs                                  RegistrarBarco/
+                                                  ...
+```
+
+**La idea:** cuando implementas "asignar barco a amarre", en la versión por capas tocas 5 carpetas distintas. En Vertical Slice, tocas **una**. Cada *slice* (rebanada) contiene todo lo que necesita un caso de uso, de HTTP a base de datos, y puede tomar sus propias decisiones: una slice simple usa el `DbContext` directamente; una compleja, un modelo de dominio rico.
+
+```csharp
+// Features/Amarres/AsignarBarco/AsignarBarco.cs — una slice entera en un archivo (estilo "minimal")
+public static class AsignarBarco
+{
+    public record Request(long BarcoId);
+
+    public static void MapEndpoint(IEndpointRouteBuilder app) =>
+        app.MapPut("/api/amarres/{id:long}/barco", Handle);
+
+    private static async Task<IResult> Handle(long id, Request req, MarinaDbContext db, CancellationToken ct)
+    {
+        var amarre = await db.Amarres.FindAsync([id], ct);
+        if (amarre is null) return Results.NotFound();
+
+        if (await db.Amarres.AnyAsync(a => a.BarcoId == req.BarcoId, ct))
+            return Results.Conflict($"El barco {req.BarcoId} ya tiene amarre.");
+
+        amarre.BarcoId = req.BarcoId;
+        await db.SaveChangesAsync(ct);
+        return Results.NoContent();
+    }
+}
+```
+
+| | Por capas (Clean/Onion) | Vertical Slice |
+|---|---|---|
+| Unidad de cambio | Una funcionalidad toca N carpetas | Una funcionalidad = una carpeta |
+| Reutilización | Alta (servicios compartidos) | Baja a propósito (se prefiere duplicar un poco) |
+| Riesgo típico | Servicios "dios" con 40 métodos | Lógica de negocio duplicada entre slices |
+| Encaja con | Dominios ricos, equipos grandes, vida larga | APIs con muchos casos de uso independientes, CQRS |
+
+**Suele venir acompañada de CQRS** (separar *commands*, que cambian estado, de *queries*, que solo leen) y, en muchos proyectos, de la librería **MediatR** para despachar cada command/query a su *handler*.
+
+> 🧠 **Mentalidad Java → C#:** en Java esto se conoce como **"package by feature"** frente a "package by layer", y existe el mismo debate. CQRS con un *mediator* se ve más en .NET que en Spring, donde lo habitual es llamar al servicio directamente (o usar Axon en proyectos muy orientados a eventos).
+
+> ⚠️ **Cuidado:** MediatR (y AutoMapper, del mismo autor) pasaron en 2025 a un **modelo de licencia comercial** para empresas a partir de ciertas versiones. En un proyecto heredado las verás en versiones antiguas y gratuitas; en uno nuevo, el equipo tendrá que decidir si paga licencia, usa alternativas (Mediator de martinothamar, Wolverine) o simplemente inyecta los handlers por DI sin mediador. No añadas ninguna de las dos a un proyecto de la empresa sin preguntar.
+
+> 💡 **Tip:** **no hace falta aplicar esto a MarinaApi.** El objetivo es que, si abres un repositorio de SEIDEL y ves una carpeta `Features/` con `Commands/` y `Queries/`, sepas en diez segundos qué estás mirando y dónde buscar cada cosa. Y que no son excluyentes: muchos proyectos usan capas (Domain/Infrastructure como proyectos) y slices dentro de Application.
+
+---
+
+## 11.8 Ejercicios Lección 11
+
+1. Dibuja (en papel o en Mermaid) las capas de MarinaApi tal como están hoy, con una flecha por cada dependencia. Pista: ¿en qué carpeta está declarada `IBarcoRepository`, junto a quién, y qué implicaría eso si `Services/` y `Repositories/` fueran proyectos separados?
+2. Crea una solución `Marina.sln` con los proyectos `Domain`, `Application`, `Infrastructure` y `Api` y sus referencias. Intenta escribir `using Microsoft.EntityFrameworkCore;` en una clase de `Domain` y observa el error de compilación.
+3. Mueve `IBarcoRepository` a `Domain` y su implementación a `Infrastructure`, marcándola como `internal`. Crea los métodos `AddApplication()` y `AddInfrastructure()`.
+4. Añade una clave `Database:Provider` a `appsettings.json` y haz que `AddInfrastructure` elija entre `UseSqlServer` y `UseNpgsql`. Levanta un PostgreSQL con Docker y comprueba qué consulta deja de devolver resultados por culpa de mayúsculas/minúsculas.
+5. Reproduce la *captive dependency*: registra como Singleton un servicio que reciba `MarinaDbContext`, arranca con `ASPNETCORE_ENVIRONMENT=Local` (sin validación) y lanza 50 peticiones concurrentes con un script. Anota la excepción. Después activa `ValidateOnBuild` y comprueba que la app ya no arranca.
+6. Arregla el ejercicio 5 con las tres soluciones de 11.5 y justifica cuál elegirías en este caso.
+7. Escribe un test con NetArchTest que falle si un controlador de MarinaApi depende de `MarinaApi.Repositories`.
+8. Explica en tres frases, sin usar la palabra "capa", la diferencia entre N-Tier clásico y Clean Architecture.
+9. Reescribe el endpoint "asignar barco a amarre" como una vertical slice en `Features/Amarres/AsignarBarco/` y compara con la versión por capas: ¿cuántos archivos tocaste en cada caso?
+
+---
+
+# Lección 12: Modelado del dominio, errores y validación
+
+[[#Índice|↑ Volver al índice]]
+
+La Lección 11 decidió **dónde** va cada pieza. Esta decide **cómo se escribe** lo que hay dentro: quién confirma los cambios en base de datos, dónde viven las reglas de negocio, cómo se comunica que algo "no se puede hacer" sin abusar de las excepciones, y en qué punto se valida cada cosa.
+
+Todas las secciones usan el mismo caso real de MarinaApi: **asignar un barco a un amarre**, que ya existe en `AmarreService.AssignBarcoAsync` y lanza `ConflictException` cuando el barco ya tiene amarre.
+
+> 🧠 **Mentalidad Java → C#:** en Spring, casi todo este terreno lo cubren anotaciones: `@Transactional` delimita la unidad de trabajo, `@Valid` dispara la validación, `@ControllerAdvice` traduce excepciones. En .NET hay menos magia declarativa y más código explícito. Al principio parece más trabajo; a cambio, lo que ocurre está escrito donde lo lees, sin proxies AOP que actúen por detrás.
+
+---
+
+## 12.1 Unit of Work
+
+**Unit of Work** (Martin Fowler, *Patterns of Enterprise Application Architecture*) es un objeto que **registra todos los cambios hechos durante una operación de negocio y los confirma juntos, en una sola transacción**, al final. Repository responde a "¿cómo obtengo y guardo entidades?"; Unit of Work responde a "¿cuándo se confirma todo lo que he cambiado?".
+
+### La sorpresa: EF Core ya es las dos cosas
+
+```
+DbSet<Barco>   → ya es un Repository   (Add, Remove, Find, consultas LINQ)
+DbContext      → ya es un Unit of Work (el Change Tracker acumula; SaveChangesAsync confirma todo en una transacción)
+```
+
+Lo viste en la [[#8.7 Change tracking, AsNoTracking y el problema N+1|Lección 8.7]] (el Change Tracker) y en la [[#8.8 Transacciones explícitas|Lección 8.8]] (`SaveChangesAsync` es transaccional por sí mismo). La pregunta real no es "¿cómo implemento Unit of Work?" sino **"¿cómo evito romper el que ya tengo?"**.
+
+### Cómo se rompe (y MarinaApi lo hace)
+
+El `GenericRepository` de MarinaApi llama a `SaveChangesAsync` **dentro de cada método**:
+
+```csharp
+public async Task UpdateAsync(T entity, CancellationToken ct = default)
+{
+    _dbSet.Update(entity);
+    await _context.SaveChangesAsync(ct);     // ← cada repositorio confirma por su cuenta
+}
+```
+
+Con una sola operación por caso de uso no se nota. Pero imagina que asignar un barco también debe dejar constancia en un histórico:
+
+```csharp
+amarre.BarcoId = dto.BarcoId;
+await _amarreRepository.UpdateAsync(amarre, ct);                        // transacción 1: COMMIT
+await _historicoRepository.AddAsync(new MovimientoAmarre(...), ct);     // transacción 2: falla → 💥
+```
+
+La primera transacción ya se confirmó. El amarre queda asignado **sin histórico**, y no hay rollback posible. Es exactamente el bug que Unit of Work existe para evitar.
+
+### La forma correcta: los repositorios no guardan, el caso de uso sí
+
+```csharp
+// Domain (o Application) — el contrato
+public interface IUnitOfWork
+{
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+}
+
+// Infrastructure — el DbContext lo implementa sin escribir nada: ya tiene ese método
+public class MarinaDbContext : DbContext, IUnitOfWork
+{
+    public DbSet<Barco> Barcos => Set<Barco>();
+    public DbSet<Amarre> Amarres => Set<Amarre>();
+    public DbSet<MovimientoAmarre> Movimientos => Set<MovimientoAmarre>();
+
+    public MarinaDbContext(DbContextOptions<MarinaDbContext> options) : base(options) { }
+}
+
+// Registro: IUnitOfWork resuelve AL MISMO DbContext del scope que usan los repositorios
+services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<MarinaDbContext>());
+```
+
+```csharp
+// Application — el caso de uso delimita la unidad de trabajo
+public class AmarreService : IAmarreService
+{
+    private readonly IAmarreRepository _amarres;
+    private readonly IBarcoRepository _barcos;
+    private readonly IMovimientoRepository _movimientos;
+    private readonly IUnitOfWork _unitOfWork;
+
+    public AmarreService(IAmarreRepository amarres, IBarcoRepository barcos,
+                         IMovimientoRepository movimientos, IUnitOfWork unitOfWork)
+    {
+        _amarres = amarres; _barcos = barcos; _movimientos = movimientos; _unitOfWork = unitOfWork;
+    }
+
+    public async Task AsignarBarcoAsync(long amarreId, long barcoId, CancellationToken ct)
+    {
+        var amarre = await _amarres.ObtenerPorIdAsync(amarreId, ct)
+            ?? throw new NotFoundException(nameof(Amarre), amarreId);
+
+        amarre.BarcoId = barcoId;                                      // cambio 1 (en memoria; en 12.2 será amarre.AsignarBarco(barco))
+        _movimientos.Agregar(MovimientoAmarre.Asignacion(amarreId, barcoId));   // cambio 2 (en memoria)
+
+        await _unitOfWork.SaveChangesAsync(ct);                        // UN commit: los dos o ninguno
+    }
+}
+```
+
+**Por qué funciona:** los tres repositorios y el `IUnitOfWork` reciben **la misma instancia** de `MarinaDbContext`, porque es Scoped y todos se resuelven dentro de la misma petición HTTP. El Change Tracker de esa instancia acumula ambos cambios, y el único `SaveChangesAsync` los envía en una transacción. Aquí se ve por qué la [[#11.5 Captive dependency en profundidad|captive dependency de la Lección 11.5]] es tan dañina: rompe precisamente este "todos comparten el mismo contexto durante la petición".
+
+> 🧠 **Mentalidad Java → C#:** en Spring esto lo hace `@Transactional` sobre el método del servicio: el proxy abre la transacción al entrar, el `EntityManager` (que también es un Unit of Work: el *persistence context*) acumula cambios, y el *flush* + *commit* ocurren al salir. Los `save()` de Spring Data dentro de un `@Transactional` no confirman nada por sí solos. En .NET no hay atributo ni proxy: **la frontera de la unidad de trabajo es la línea donde escribes `SaveChangesAsync`**. Es más explícito y no tiene las trampas de `@Transactional` (auto-invocación que se salta el proxy, métodos `private` que lo ignoran, excepciones *checked* que no hacen rollback).
+
+### Cuándo necesitas más que `SaveChangesAsync`
+
+El `IUnitOfWork` anterior cubre el 90% de los casos. Para el resto —varias llamadas a `SaveChanges` que deben ir juntas, o mezclar EF con SQL directo— se añade la transacción explícita de la [[#8.8 Transacciones explícitas|Lección 8.8]]:
+
+```csharp
+public interface IUnitOfWork
+{
+    Task<int> SaveChangesAsync(CancellationToken ct = default);
+    Task EjecutarEnTransaccionAsync(Func<CancellationToken, Task> operacion, CancellationToken ct = default);
+}
+
+// En MarinaDbContext
+public async Task EjecutarEnTransaccionAsync(Func<CancellationToken, Task> operacion, CancellationToken ct = default)
+{
+    // La estrategia de ejecución es obligatoria si se activó EnableRetryOnFailure (ver Cuidado de abajo)
+    var estrategia = Database.CreateExecutionStrategy();
+
+    await estrategia.ExecuteAsync(async () =>
+    {
+        await using var transaccion = await Database.BeginTransactionAsync(ct);
+        await operacion(ct);
+        await SaveChangesAsync(ct);
+        await transaccion.CommitAsync(ct);
+    });
+}
+```
+
+> ⚠️ **Cuidado:** en Azure SQL es casi obligatorio activar reintentos ante fallos transitorios (`UseSqlServer(cadena, o => o.EnableRetryOnFailure())`). En cuanto lo haces, **cualquier** `BeginTransactionAsync` escrito "a pelo" como en la Lección 8.8 lanza: `InvalidOperationException: The configured execution strategy 'SqlServerRetryingExecutionStrategy' does not support user-initiated transactions`. La solución es envolverlo en `CreateExecutionStrategy().ExecuteAsync(...)`, como arriba, para que el reintento repita la transacción completa. Tenerlo centralizado en el Unit of Work evita repetir ese envoltorio en cada servicio.
+
+> ⚠️ **Cuidado — concurrencia optimista y Unit of Work:** la `DbUpdateConcurrencyException` de la [[#Concurrencia optimista: dos usuarios editando lo mismo|Lección 8.8]] salta **en `SaveChangesAsync`**, es decir, en el Unit of Work, no en el repositorio. Si tus repositorios guardan por su cuenta, esa excepción puede aparecer en mitad del caso de uso con la mitad de los cambios ya confirmados. Con un único `SaveChangesAsync` al final, o se aplica todo o no se aplica nada, y el servicio puede traducirla limpiamente a un 409 (con una excepción o con un `Result`, ver 12.3).
+
+> 💡 **Tip — el debate que oirás:** "¿para qué envolver `DbContext` en repositorios y un `IUnitOfWork`, si ya lo son?" Es una discusión legítima y hay equipos .NET que inyectan el `DbContext` directamente en los servicios (sobre todo con Vertical Slice). Los argumentos a favor de envolverlo: los tests unitarios mockean `IBarcoRepository` fácilmente (mockear `DbSet<T>` es muy incómodo), Application no depende de EF Core, y las consultas quedan con nombre en un único sitio. No hay respuesta universal: sigue la convención del proyecto en el que estés.
+
+> ⚠️ **Cuidado:** `TransactionScope` (la otra forma de transacciones en .NET, heredada de .NET Framework) **no fluye entre `await` por defecto**. Si lo ves en código heredado, debe construirse con `TransactionScopeAsyncFlowOption.Enabled`; sin esa opción, el código tras el primer `await` puede ejecutarse fuera de la transacción sin ningún error visible.
+
+---
+
+## 12.2 Anemic Domain Model vs Rich Domain Model
+
+### El modelo anémico
+
+Un **modelo anémico** es aquel en el que las entidades son **bolsas de datos con getters y setters públicos**, y toda la lógica vive en servicios. Es lo que tiene MarinaApi ahora mismo:
+
+```csharp
+public class Amarre
+{
+    public long Id { get; set; }
+    public string Ubicacion { get; set; } = string.Empty;
+    public double Precio { get; set; }
+    public int Longitud { get; set; }
+    public long? BarcoId { get; set; }            // cualquiera, desde cualquier sitio, puede ponerle cualquier valor
+    public Barco? Barco { get; set; }
+}
+
+// Las reglas viven fuera, en el servicio
+if (amarre.BarcoId is not null) throw new ConflictException("El amarre ya está ocupado.");
+if (barco.Eslora > amarre.Longitud) throw new ConflictException("El barco no cabe.");
+amarre.BarcoId = dto.BarcoId;
+```
+
+Martin Fowler lo llamó *antipatrón* en 2003, pero conviene matizar: **no es un error en sí mismo**. El problema aparece cuando las reglas de negocio importan y el proyecto crece:
+
+- **Las reglas se duplican.** Otro servicio (una importación masiva, un endpoint de administración) hace `amarre.BarcoId = x` sin comprobar que cabe. Nadie lo impide.
+- **El estado inválido es representable.** Un `Amarre` con `Precio = -50` o `Longitud = 0` compila y se guarda.
+- **Para saber qué puede hacer un amarre hay que buscar en todos los servicios** que lo tocan.
+
+### El modelo rico
+
+Un **modelo rico** pone el comportamiento **junto a los datos que protege**. La entidad no expone setters públicos: expone **operaciones con nombre de negocio** que garantizan sus invariantes.
+
+```csharp
+public class Amarre
+{
+    public long Id { get; private set; }
+    public string Ubicacion { get; private set; }
+    public decimal PrecioDia { get; private set; }
+    public decimal LongitudMaxima { get; private set; }
+    public long? BarcoId { get; private set; }
+
+    private Amarre() { Ubicacion = null!; }          // para EF Core (puede usar constructores privados)
+
+    public Amarre(string ubicacion, decimal precioDia, decimal longitudMaxima)
+    {
+        if (string.IsNullOrWhiteSpace(ubicacion)) throw new ArgumentException("Ubicación obligatoria.", nameof(ubicacion));
+        if (precioDia <= 0)       throw new ArgumentOutOfRangeException(nameof(precioDia));
+        if (longitudMaxima <= 0)  throw new ArgumentOutOfRangeException(nameof(longitudMaxima));
+
+        Ubicacion = ubicacion;
+        PrecioDia = precioDia;
+        LongitudMaxima = longitudMaxima;
+    }
+
+    public bool EstaLibre => BarcoId is null;
+
+    public Result AsignarBarco(Barco barco)
+    {
+        if (!EstaLibre)                        return ErroresAmarre.Ocupado(Id);
+        if (barco.Eslora.Metros > LongitudMaxima) return ErroresAmarre.BarcoNoCabe(barco.Eslora, LongitudMaxima);
+
+        BarcoId = barco.Id;
+        return Result.Exito();
+    }
+
+    public void Liberar() => BarcoId = null;
+
+    public void ActualizarPrecio(decimal nuevoPrecio)
+    {
+        if (nuevoPrecio <= 0) throw new ArgumentOutOfRangeException(nameof(nuevoPrecio));
+        PrecioDia = nuevoPrecio;
+    }
+}
+```
+
+(`Result` y `ErroresAmarre` se definen en la sección 12.3.)
+
+Ahora **es imposible** asignar un barco que no cabe, desde cualquier servicio, importación o test: la única puerta de entrada es `AsignarBarco`, y la regla está dentro. El servicio se queda con lo que le corresponde, orquestar:
+
+```csharp
+var amarre = await _amarres.ObtenerPorIdAsync(amarreId, ct);
+var barco  = await _barcos.ObtenerPorIdAsync(barcoId, ct);
+// ... comprobaciones de existencia ...
+var resultado = amarre.AsignarBarco(barco);
+if (resultado.EsFallo) return resultado.Error;
+await _unitOfWork.SaveChangesAsync(ct);
+```
+
+**EF Core soporta sin problema este estilo:** setters privados, constructor privado sin parámetros, y colecciones encapsuladas mediante *backing fields*:
+
+```csharp
+public class Barco
+{
+    private readonly List<Tripulante> _tripulantes = new();              // EF lo detecta por convención (_tripulantes)
+    public IReadOnlyCollection<Tripulante> Tripulantes => _tripulantes;  // hacia fuera, solo lectura
+
+    public Result EmbarcarTripulante(Tripulante t)
+    {
+        if (_tripulantes.Count >= Capacidad) return ErroresBarco.CapacidadCompleta(Id, Capacidad);
+        _tripulantes.Add(t);
+        return Result.Exito();
+    }
+    // ...
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** **por qué en Java/Spring casi siempre se acaba en el modelo anémico** no es por falta de conocimiento, sino por inercia del ecosistema:
+> - La convención **JavaBeans** (getter y setter para todo) es anterior a JPA, y muchos frameworks (Jackson, MapStruct, JSP, formularios de Spring MVC) la asumieron.
+> - **Lombok `@Data`** genera setters públicos para todo con una anotación, así que es lo que sale por defecto.
+> - JPA exige un constructor sin argumentos y, con acceso por propiedad, getters/setters; mucha gente no sabe que Hibernate funciona perfectamente con **acceso por campo** y constructores `protected`.
+> - La entidad `@Entity` se reutiliza como DTO de entrada en `@RequestBody`, lo que obliga a que tenga setters.
+>
+> En C#, `{ get; private set; }` cuesta exactamente las mismas pulsaciones que `{ get; set; }`, EF Core no necesita setters públicos, y los DTOs son `record` separados desde el principio (Lección 10.4). El modelo rico sale **casi gratis**; por eso se ve mucho más en proyectos .NET.
+
+> ⚠️ **Cuidado:** no conviertas cada tabla en un objeto rico por principio. Una tabla de "provincias" o de "tipos de embarcación" sin reglas es un CRUD y un modelo anémico es lo correcto para ella. El modelo rico compensa donde **hay invariantes que proteger**: estados, límites, transiciones ("una reserva cancelada no se puede confirmar"). Aplica el esfuerzo donde está el negocio.
+
+> 💡 **Tip:** el siguiente escalón de un modelo rico son los **eventos de dominio**: `AsignarBarco` añade un `BarcoAsignadoEvent` a una lista interna de la entidad, y el `DbContext` los publica al hacer `SaveChangesAsync` para que otros componentes reaccionen (enviar un email, actualizar una estadística) sin que `Amarre` los conozca. No hace falta que lo implementes ahora; basta con reconocerlo si aparece en un proyecto con DDD.
+
+### Value objects con `record`: el modelo rico sin boilerplate
+
+Un **value object** es un concepto del dominio definido **solo por su valor**, sin identidad propia: una eslora, un importe con moneda, una matrícula, un rango de fechas. Dos esloras de 12,5 m son *la misma* eslora. Y un value object **nunca está en estado inválido**: si existe, es válido.
+
+Es exactamente lo que la [[#Lección 9: Records y Pattern Matching|Lección 9]] dice que hace un `record`: inmutable e igualdad por valor.
+
+```csharp
+public sealed record Eslora
+{
+    public const decimal MaximoMetros = 400m;
+    public decimal Metros { get; }                     // SIN init: ver el Cuidado de abajo
+
+    public Eslora(decimal metros)
+    {
+        if (metros <= 0 || metros > MaximoMetros)
+            throw new ArgumentOutOfRangeException(nameof(metros), metros, $"La eslora debe estar entre 0 y {MaximoMetros} m.");
+        Metros = decimal.Round(metros, 2);
+    }
+
+    public bool CabeEn(decimal longitudAmarre) => Metros <= longitudAmarre;
+    public override string ToString() => $"{Metros:0.##} m";
+}
+
+public sealed record Matricula
+{
+    public string Valor { get; }
+
+    public Matricula(string valor)
+    {
+        var normalizada = valor?.Trim().ToUpperInvariant().Replace(" ", "");
+        if (string.IsNullOrEmpty(normalizada) || !Regex.IsMatch(normalizada, @"^[0-9]{1,2}[A-Z]{2}-[0-9]-[0-9]{1,4}-[0-9]{2}$"))
+            throw new ArgumentException($"Matrícula no válida: '{valor}'", nameof(valor));
+        Valor = normalizada;
+    }
+}
+
+public sealed record Dinero(decimal Importe, string Moneda)
+{
+    public static Dinero Euros(decimal importe) => new(importe, "EUR");
+
+    public static Dinero operator +(Dinero a, Dinero b) =>
+        a.Moneda == b.Moneda
+            ? a with { Importe = a.Importe + b.Importe }
+            : throw new InvalidOperationException($"No se pueden sumar {a.Moneda} y {b.Moneda}.");
+}
+```
+
+```csharp
+new Eslora(12.5m) == new Eslora(12.50m)     // true — igualdad por valor, gratis
+var total = Dinero.Euros(30) + Dinero.Euros(12);   // Dinero { Importe = 42, Moneda = EUR }
+```
+
+Ahora `Barco` usa `Eslora` en vez de `int Eslora`, y el compilador impide pasar una manga donde se esperaba una eslora, o un `decimal` sin validar.
+
+**Mapearlos en EF Core:**
+
+```csharp
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    // Value object de un solo valor → una columna, con conversión
+    modelBuilder.Entity<Barco>()
+        .Property(b => b.Eslora)
+        .HasConversion(e => e.Metros, metros => new Eslora(metros))
+        .HasPrecision(6, 2);
+
+    // Value object de varios valores → varias columnas en la misma tabla (EF Core 8+)
+    modelBuilder.Entity<Reserva>()
+        .ComplexProperty(r => r.Total);   // columnas Total_Importe y Total_Moneda
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** Java tiene `record` desde Java 16 y sirven para lo mismo, y Hibernate 6.2+ acepta records como `@Embeddable`. La diferencia práctica está en tres detalles: los records de C# admiten **expresiones `with`** para copiar cambiando un campo, pueden declararse con cuerpo y propiedades calculadas con total naturalidad, y existen `record struct` para value objects pequeños sin coste de asignación en el heap. En Java, antes de los records, un value object correcto requería `equals`, `hashCode`, `toString`, constructor y campos `final` a mano — que es por lo que casi nadie los escribía.
+
+> ⚠️ **Cuidado — `with` se salta el constructor.** Si declaras la propiedad con `init` (`public decimal Metros { get; init; }`, o con la sintaxis posicional `record Eslora(decimal Metros)`), alguien puede escribir `eslora with { Metros = -3 }` y obtener una eslora inválida: `with` copia el objeto y asigna la propiedad **sin pasar por tu constructor**. Para value objects con validación, usa propiedades `{ get; }` sin `init` y valida en el constructor, como en `Eslora` arriba. El record `Dinero` sí es posicional porque no tiene invariantes que proteger en sus campos individuales.
+
+---
+
+## 12.3 Result pattern: errores esperados sin excepciones
+
+MarinaApi resuelve el caso "el barco ya tiene amarre" así:
+
+```csharp
+// Service
+if (amarreExistente is not null)
+    throw new ConflictException($"El Barco con Id {dto.BarcoId} ya tiene asignado el Amarre {amarreExistente.Id}.");
+
+// Middleware
+catch (ConflictException ex) { await WriteProblemAsync(context, HttpStatusCode.Conflict, ex.Message); }
+```
+
+Funciona, y es lo que harías en Spring con `@ControllerAdvice`. Pero tiene tres problemas que aparecen al crecer:
+
+1. **La firma miente.** `Task<AmarreDto> AssignBarcoAsync(...)` dice "devuelvo un amarre". No dice que puede fallar de tres maneras de negocio distintas. Hay que leer el cuerpo (o la documentación, si existe) para saberlo.
+2. **Es un `goto` invisible.** La excepción salta desde el servicio hasta el middleware atravesando el controlador, que no se entera. Si alguien añade un `catch (Exception)` en medio, rompe el flujo en silencio.
+3. **"Conflicto" no es excepcional.** Que un usuario intente asignar un barco que ya tiene amarre es un caso de uso normal y previsto. Las excepciones están pensadas para lo inesperado (base de datos caída, bug), y son relativamente caras: capturan el *stack trace* completo.
+
+### La alternativa: devolver el error como valor
+
+```csharp
+// ─── Domain/Common/Error.cs ───
+public enum TipoError { Validacion, NoEncontrado, Conflicto, Prohibido }
+
+public sealed record Error(string Codigo, string Mensaje, TipoError Tipo)
+{
+    public static Error NoEncontrado(string codigo, string mensaje) => new(codigo, mensaje, TipoError.NoEncontrado);
+    public static Error Conflicto(string codigo, string mensaje)    => new(codigo, mensaje, TipoError.Conflicto);
+    public static Error Validacion(string codigo, string mensaje)   => new(codigo, mensaje, TipoError.Validacion);
+}
+
+// ─── Domain/Common/Result.cs ───
+public class Result
+{
+    public Error? Error { get; }
+
+    [MemberNotNullWhen(true, nameof(Error))]
+    public bool EsFallo => Error is not null;
+
+    [MemberNotNullWhen(false, nameof(Error))]
+    public bool EsExito => Error is null;
+
+    protected Result(Error? error) => Error = error;
+
+    public static Result Exito() => new(null);
+    public static Result Fallo(Error error) => new(error);
+
+    public static implicit operator Result(Error error) => Fallo(error);
+}
+
+public sealed class Result<T> : Result
+{
+    private readonly T? _valor;
+
+    public T Valor => EsExito
+        ? _valor!
+        : throw new InvalidOperationException("No se puede leer el valor de un Result fallido.");
+
+    private Result(T valor) : base(null) => _valor = valor;
+    private Result(Error error) : base(error) { }
+
+    public static Result<T> Exito(T valor) => new(valor);
+    public static new Result<T> Fallo(Error error) => new(error);
+
+    public static implicit operator Result<T>(T valor) => Exito(valor);      // return dto;    → éxito
+    public static implicit operator Result<T>(Error error) => Fallo(error);  // return error;  → fallo
+}
+```
+
+```csharp
+// ─── Domain/Amarres/ErroresAmarre.cs ─── catálogo de errores con nombre: se buscan, se testean y se documentan
+public static class ErroresAmarre
+{
+    public static Error NoEncontrado(long id) =>
+        Error.NoEncontrado("Amarre.NoEncontrado", $"No existe el amarre {id}.");
+
+    public static Error Ocupado(long id) =>
+        Error.Conflicto("Amarre.Ocupado", $"El amarre {id} ya tiene un barco asignado.");
+
+    public static Error BarcoYaAmarrado(long barcoId, long amarreId) =>
+        Error.Conflicto("Amarre.BarcoYaAmarrado", $"El barco {barcoId} ya tiene asignado el amarre {amarreId}.");
+
+    public static Error BarcoNoCabe(Eslora eslora, decimal longitudMaxima) =>
+        Error.Conflicto("Amarre.BarcoNoCabe", $"Un barco de {eslora} no cabe en un amarre de {longitudMaxima} m.");
+}
+```
+
+```csharp
+// ─── Application — la firma ahora dice la verdad: "puede fallar" ───
+public async Task<Result<AmarreDto>> AsignarBarcoAsync(long amarreId, long barcoId, CancellationToken ct)
+{
+    var amarre = await _amarres.ObtenerPorIdAsync(amarreId, ct);
+    if (amarre is null) return ErroresAmarre.NoEncontrado(amarreId);         // conversión implícita a Result<T>
+
+    var barco = await _barcos.ObtenerPorIdAsync(barcoId, ct);
+    if (barco is null) return ErroresBarco.NoEncontrado(barcoId);
+
+    var amarreActual = await _amarres.ObtenerPorBarcoIdAsync(barcoId, ct);
+    if (amarreActual is not null) return ErroresAmarre.BarcoYaAmarrado(barcoId, amarreActual.Id);
+
+    var asignacion = amarre.AsignarBarco(barco);                            // la regla vive en Domain (12.2)
+    if (asignacion.EsFallo) return asignacion.Error;
+
+    await _unitOfWork.SaveChangesAsync(ct);
+    return amarre.ToDto();                                                  // conversión implícita: éxito
+}
+```
+
+```csharp
+// ─── Api — traducir Result → HTTP, UNA vez, para toda la API ───
+public static class ResultExtensions
+{
+    public static ActionResult ToProblem(this ControllerBase controller, Error error) =>
+        controller.Problem(
+            title: error.Codigo,
+            detail: error.Mensaje,
+            statusCode: error.Tipo switch                // switch expression de la Lección 9
+            {
+                TipoError.Validacion   => StatusCodes.Status400BadRequest,
+                TipoError.NoEncontrado => StatusCodes.Status404NotFound,
+                TipoError.Conflicto    => StatusCodes.Status409Conflict,
+                TipoError.Prohibido    => StatusCodes.Status403Forbidden,
+                _                      => StatusCodes.Status500InternalServerError
+            });
+}
+
+// Controlador: sin try/catch, y el flujo se lee de arriba abajo
+[HttpPut("{id:long}/barco")]
+public async Task<ActionResult<AmarreDto>> AsignarBarco(long id, AsignarBarcoDto dto, CancellationToken ct)
+{
+    var resultado = await _servicio.AsignarBarcoAsync(id, dto.BarcoId, ct);
+
+    return resultado.EsExito
+        ? Ok(resultado.Valor)
+        : this.ToProblem(resultado.Error);
+}
+```
+
+**Qué has ganado:** la firma documenta que puede fallar; el compilador (con nulabilidad activada y `[MemberNotNullWhen]`) te avisa si usas `Error` sin comprobar; los tests comprueban `resultado.Error.Should().Be(ErroresAmarre.Ocupado(3))` gracias a la igualdad por valor del `record`; y no hay saltos invisibles.
+
+### ¿Entonces ya no se lanzan excepciones?
+
+Sí se lanzan. La regla que usan la mayoría de equipos:
+
+| Situación | Mecanismo | Ejemplo |
+|---|---|---|
+| Error **esperado**, parte del caso de uso, el cliente puede corregirlo | `Result` | Barco ya amarrado, saldo insuficiente, reserva fuera de plazo |
+| **Violación de un invariante** por un bug del programador | Excepción | `new Eslora(-3)`, argumento null donde no debe |
+| Fallo **de infraestructura** | Excepción (y middleware → 500) | Base de datos caída, timeout del SOAP legacy |
+
+"No encontrado" está en la frontera y verás las dos opciones en proyectos reales.
+
+> 🧠 **Mentalidad Java → C#:** en Spring lo estándar es lo que ya hace MarinaApi: excepciones de negocio (`EntityNotFoundException`, una `ConflictException` propia o `ResponseStatusException`) y un `@RestControllerAdvice` con `@ExceptionHandler` que las traduce. Las alternativas "con valor" existen pero son minoritarias: `Optional<T>` (solo cubre "no existe", sin motivo), `Either`/`Try` de **Vavr**, o desde Java 21 un `sealed interface Resultado permits Exito, Fallo` consumido con `switch` de patrones. En .NET, el Result pattern es mucho más habitual y hay librerías maduras: **FluentResults**, **ErrorOr**, **Ardalis.Result** y **OneOf**. Cualquiera de ellas sustituye a las clases que has escrito arriba.
+
+> ⚠️ **Cuidado — no mezcles los dos estilos al azar.** MarinaApi usa excepciones + middleware; es una decisión válida y consistente. Lo peor que puede pasar es que la mitad de los servicios devuelvan `Result` y la otra mitad lancen `ConflictException`: el controlador ya no sabe qué esperar. Si llegas a un proyecto con un estilo establecido, **síguelo**; si propones cambiarlo, hazlo para todo el módulo y en un PR aparte.
+
+> ⚠️ **Cuidado:** las conversiones implícitas de `Result<T>` **no funcionan cuando `T` es una interfaz** (C# prohíbe conversiones definidas por el usuario desde o hacia interfaces). Si el método devuelve `Result<IReadOnlyList<AmarreDto>>`, `return lista;` no compila: escribe `return Result<IReadOnlyList<AmarreDto>>.Exito(lista);` o usa un tipo concreto como `List<AmarreDto>`.
+
+> 💡 **Tip:** un `Result` que nadie comprueba es igual de peligroso que un `catch` vacío. Si ignoras el retorno de `amarre.AsignarBarco(barco)` y llamas a `SaveChangesAsync` igualmente, has perdido la regla. En code review, cada llamada que devuelve `Result` sin `if (x.EsFallo)` a continuación merece un comentario.
+
+---
+
+## 12.4 Dónde vive la validación: FluentValidation
+
+### Tres tipos de validación, tres sitios distintos
+
+Antes de la herramienta, el criterio. "Validar" son en realidad tres cosas diferentes:
+
+| Tipo | Pregunta | Ejemplo en MarinaApi | Dónde vive | Resultado HTTP |
+|---|---|---|---|---|
+| **De entrada (forma)** | ¿La petición está bien formada? | `barcoId` > 0, nombre no vacío, máximo 100 caracteres | Validador del DTO (Api/Application) | 400 |
+| **De dominio (invariantes)** | ¿Este objeto puede existir así? | Eslora entre 0 y 400 m; un amarre ocupado no admite otro barco | Entidad / value object (Domain) | 409 o 400 |
+| **De estado (contexto)** | ¿Es posible *ahora*, con lo que hay en BD? | El barco existe; no tiene ya otro amarre; la matrícula no está duplicada | Servicio de aplicación, con repositorios | 404 / 409 |
+
+El error típico es meterlo todo en el mismo sitio: o todo en anotaciones del DTO (y entonces las reglas de negocio no se aplican en la importación masiva, que no pasa por el controlador), o todo en el servicio (y el servicio se llena de `if (string.IsNullOrEmpty(...))`).
+
+### FluentValidation: validación de entrada fuera del DTO
+
+La [[#10.5 Validación con Data Annotations|Lección 10.5]] usaba atributos (`[Required]`, `[Range]`) sobre el DTO. Funciona para reglas simples. **FluentValidation** mueve las reglas a una clase aparte, con código C# normal:
+
+```bash
+dotnet add package FluentValidation
+dotnet add package FluentValidation.DependencyInjectionExtensions
+```
+
+```csharp
+public record RegistrarBarcoDto(string Nombre, string Matricula, string Tipo, decimal Eslora, decimal Manga, int Capacidad);
+
+public class RegistrarBarcoValidator : AbstractValidator<RegistrarBarcoDto>
+{
+    private static readonly string[] TiposValidos = ["Velero", "Yate", "Lancha", "Catamarán"];
+
+    public RegistrarBarcoValidator()
+    {
+        RuleFor(x => x.Nombre)
+            .NotEmpty().WithMessage("El nombre es obligatorio.")
+            .MaximumLength(100);
+
+        RuleFor(x => x.Matricula)
+            .NotEmpty()
+            .Matches(@"^[0-9]{1,2}[A-Z]{2}-[0-9]-[0-9]{1,4}-[0-9]{2}$")
+            .WithMessage("Formato de matrícula no válido (ej: 7GI-2-123-21).");
+
+        RuleFor(x => x.Tipo)
+            .Must(t => TiposValidos.Contains(t))
+            .WithMessage(x => $"Tipo '{x.Tipo}' no válido. Valores: {string.Join(", ", TiposValidos)}.");
+
+        RuleFor(x => x.Eslora).InclusiveBetween(1m, 400m);
+
+        // Reglas que relacionan varios campos: con atributos son muy incómodas
+        RuleFor(x => x.Manga)
+            .GreaterThan(0)
+            .LessThan(x => x.Eslora).WithMessage("La manga no puede ser mayor que la eslora.");
+
+        // Reglas condicionales
+        RuleFor(x => x.Capacidad)
+            .LessThanOrEqualTo(12)
+            .When(x => x.Tipo == "Lancha")
+            .WithMessage("Una lancha no puede superar 12 personas.");
+    }
+}
+```
+
+**Registro y uso** (validación explícita, la forma recomendada hoy):
+
+```csharp
+// Program.cs (o AddApplication en la Lección 11.2): registra todos los validadores del assembly
+builder.Services.AddValidatorsFromAssemblyContaining<RegistrarBarcoValidator>();
+```
+
+```csharp
+[HttpPost]
+public async Task<ActionResult<BarcoDto>> Registrar(
+    RegistrarBarcoDto dto,
+    [FromServices] IValidator<RegistrarBarcoDto> validador,
+    CancellationToken ct)
+{
+    var validacion = await validador.ValidateAsync(dto, ct);
+    if (!validacion.IsValid)
+        return ValidationProblem(new ValidationProblemDetails(validacion.ToDictionary()));   // 400, mismo formato que 10.5
+
+    var resultado = await _servicio.RegistrarAsync(dto, ct);
+    return resultado.EsExito
+        ? CreatedAtAction(nameof(ObtenerPorId), new { id = resultado.Valor.Id }, resultado.Valor)
+        : this.ToProblem(resultado.Error);
+}
+```
+
+**Testear un validador** es trivial, sin levantar ASP.NET ni mockear nada:
+
+```csharp
+[Fact]
+public void Manga_MayorQueEslora_EsInvalida()
+{
+    var validador = new RegistrarBarcoValidator();
+    var dto = new RegistrarBarcoDto("Brisa", "7GI-2-123-21", "Velero", Eslora: 8m, Manga: 9m, Capacidad: 4);
+
+    var resultado = validador.TestValidate(dto);          // helper de FluentValidation.TestHelper
+
+    resultado.ShouldHaveValidationErrorFor(x => x.Manga);
+    resultado.ShouldNotHaveValidationErrorFor(x => x.Eslora);
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** en Spring, la validación de Bean Validation (`@NotNull`, `@Size`, `@Pattern`) se pone **sobre los campos**, muy a menudo **de la propia `@Entity`**, y `@Valid` en el controlador la dispara; Hibernate además la vuelve a ejecutar al persistir. Es cómodo, pero acopla tres cosas en una clase: el esquema de BD (JPA), las reglas de entrada (validación) y el formato JSON (Jackson). Las reglas entre campos exigen escribir un `ConstraintValidator` y una anotación propia a nivel de clase; las condicionales, *validation groups*. En C# se tiende a separar más por tres razones: los DTOs de entrada ya son tipos distintos de la entidad (Lección 10.4), un validador es una clase normal que **admite inyección de dependencias** y es trivial de testear, y las reglas condicionales o entre campos se escriben como código en vez de como anotaciones personalizadas.
+
+> ⚠️ **Cuidado — `FluentValidation.AspNetCore` está desaconsejado.** MarinaApi lo tiene en su `.csproj`. Ese paquete conectaba los validadores al *model binding* para que se ejecutaran solos, como `@Valid`. Su propio autor lo marcó como no recomendado y dejó de mantenerlo: la validación automática del pipeline de MVC es **síncrona**, así que cualquier regla `MustAsync` lanza `AsyncValidatorInvokedSynchronouslyException`, y además oculta cuándo se valida. La recomendación actual es la del ejemplo: `FluentValidation` + `FluentValidation.DependencyInjectionExtensions`, y llamar a `ValidateAsync` explícitamente (o en un *endpoint filter* reutilizable si usas Minimal APIs).
+
+> ⚠️ **Cuidado:** es tentador usar `MustAsync` para comprobar contra la base de datos ("la matrícula no existe ya"). Funciona, pero mezcla validación de **forma** con validación de **estado**, y la comprobación tiene condición de carrera: dos peticiones simultáneas pasan el validador y ambas insertan. Las reglas de estado van en el servicio (devolviendo `Result` con un `Error.Conflicto`) y, para la unicidad, **siempre respaldadas por un índice único en la base de datos**, que es lo único que la garantiza de verdad.
+
+> 💡 **Tip:** la validación de entrada y la del dominio **se solapan a propósito**. Que `RegistrarBarcoValidator` compruebe `Eslora` entre 1 y 400 da un 400 bonito con todos los errores a la vez para el usuario; que `new Eslora(...)` lance si recibe un valor fuera de rango garantiza que ningún otro camino (una importación CSV, un job nocturno) cree un barco imposible. La primera es para la experiencia del cliente; la segunda, para la integridad del sistema.
+
+---
+
+## 12.5 Mapeo entre capas: manual o con librería
+
+Con capas separadas, un mismo concepto tiene varias representaciones: `RegistrarBarcoDto` (entrada) → `Barco` (dominio) → `BarcoDto` (salida). Alguien tiene que convertir.
+
+```csharp
+// Opción 1 — Manual, con métodos de extensión (lo que ya hace MarinaApi en Mapping/)
+public static class BarcoMapper
+{
+    public static BarcoDto ToDto(this Barco b) =>
+        new(b.Id, b.Nombre, b.Matricula.Valor, b.Eslora.Metros, b.Amarre?.Ubicacion);
+}
+
+// Proyección directa a DTO en la consulta: la opción más eficiente (Lección 8.6)
+await _db.Barcos
+    .Select(b => new BarcoDto(b.Id, b.Nombre, b.Matricula.Valor, b.Eslora.Metros, b.Amarre!.Ubicacion))
+    .ToListAsync(ct);
+```
+
+| | Manual | AutoMapper / Mapster | Mapperly (source generator) |
+|---|---|---|---|
+| Errores al renombrar una propiedad | **En compilación** | En tiempo de ejecución (o test de configuración) | **En compilación** (avisos) |
+| Depurar un campo que llega vacío | F12 y lo ves | Reflexión / convenciones ocultas | Código generado legible |
+| Código a escribir | Más | Mínimo | Mínimo |
+| Rendimiento | Máximo | Algo menor | Igual al manual |
+
+> 🧠 **Mentalidad Java → C#:** es el mismo debate que **MapStruct** vs mapeo a mano en Java. MapStruct genera el código en compilación, así que su equivalente real en .NET es **Mapperly**, no AutoMapper (que funciona por reflexión en tiempo de ejecución).
+
+> 💡 **Tip:** en proyectos heredados verás mucho **AutoMapper**; conviene saber leer un `Profile` con `CreateMap<Barco, BarcoDto>()`. En proyectos nuevos la tendencia es mapeo manual o Mapperly, más aún desde que AutoMapper pasó a licencia comercial en 2025 (ver 11.7). El mapeo manual de MarinaApi es una elección perfectamente defendible.
+
+---
+
+## 12.6 Ejercicios Lección 12
+
+1. Demuestra el bug de 12.1 en MarinaApi: añade una entidad `MovimientoAmarre` y haz que `AssignBarcoAsync` guarde el amarre y después lance una excepción antes de guardar el movimiento. Comprueba en la base de datos que el amarre quedó asignado.
+2. Arregla el ejercicio 1: quita `SaveChangesAsync` de `GenericRepository`, crea `IUnitOfWork`, regístralo apuntando al mismo `MarinaDbContext` y confirma los dos cambios con una sola llamada.
+3. Activa `EnableRetryOnFailure` en `UseSqlServer`, escribe una transacción explícita como la de la Lección 8.8 y observa la excepción. Arréglala con `CreateExecutionStrategy`.
+4. Convierte `Amarre` en una entidad rica: setters privados, constructor que valida, y métodos `AsignarBarco`, `Liberar` y `ActualizarPrecio`. Comprueba que EF Core sigue leyendo y guardando.
+5. Crea el value object `Eslora` como `record` con validación y mapéalo con `HasConversion`. Intenta saltarte la validación con `with` usando primero una propiedad `init` y después una `{ get; }`: ¿qué cambia?
+6. Implementa `Error`, `Result` y `Result<T>`, y reescribe `AssignBarcoAsync` para que devuelva `Result<AmarreDto>` sin lanzar `ConflictException`. Adapta el controlador con `ToProblem`.
+7. Escribe tres tests del ejercicio 6 (éxito, amarre ocupado, barco inexistente) comparando el `Error` devuelto por igualdad de `record`.
+8. Crea `RegistrarBarcoValidator` con al menos una regla entre campos y una condicional, sustituye `FluentValidation.AspNetCore` por la validación explícita y testea el validador con `TestValidate`.
+9. Clasifica estas reglas en entrada / dominio / estado y di dónde implementarías cada una: "el nombre no puede superar 100 caracteres", "no se puede liberar un amarre libre", "la matrícula no puede estar repetida", "un tripulante no puede estar en dos barcos que compiten en la misma regata".
+
+---
+
+# Lección 13: API lista para producción
+
+[[#Índice|↑ Volver al índice]]
+
+Una API "lista para producción" no es la que tiene más funcionalidades, sino la que **se puede operar**: evoluciona sin romper a sus clientes, avisa cuando está enferma, falla de forma controlada, sobrevive a que un sistema del que depende se caiga, y ejecuta tareas periódicas sin duplicarlas. Nada de esto se ve en una demo; todo se nota el primer mes en Azure o AWS.
+
+> 🧠 **Mentalidad Java → C#:** en Spring Boot buena parte de esto viene "de serie" con un par de *starters*: **Actuator** te da `/actuator/health`, métricas e info; **Resilience4j** los reintentos; `@Scheduled` las tareas periódicas. En ASP.NET Core existen equivalentes de primera calidad, pero **son opt-in**: nada aparece hasta que lo registras en `Program.cs`. Si no lo pides, no lo tienes — y nadie te avisará de que falta.
+
+---
+
+## 13.1 API versioning
+
+### Por qué importa
+
+Una API interna de un proyecto de clase tiene un cliente: tu propio frontend, que despliegas a la vez. Una API de una consultora como SEIDEL, que lleva años en producción, tiene clientes que **no controlas**: la app móvil que un usuario no ha actualizado, el ERP de un cliente que la integró en 2021, un proceso nocturno de otro departamento. Si cambias un contrato, rompes a gente que no sabe que has desplegado.
+
+**Qué es un cambio incompatible (*breaking change*) y qué no:**
+
+| ✅ Compatible (no requiere nueva versión) | ❌ Incompatible (requiere nueva versión) |
+|---|---|
+| Añadir un endpoint nuevo | Eliminar o renombrar un endpoint |
+| Añadir un campo **opcional** a la respuesta | Eliminar o renombrar un campo de la respuesta |
+| Añadir un parámetro **opcional** a la petición | Hacer obligatorio un campo que era opcional |
+| Aceptar más valores en un enum de entrada | Cambiar el tipo de un campo (`int` → `string`) |
+| Mejorar un mensaje de error | Cambiar el significado de un código HTTP o de un campo |
+
+> ⚠️ **Cuidado:** "añadir un valor a un enum **de salida**" parece inocente y rompe clientes que hacen `switch` exhaustivo sobre él (un `switch` expression de C# sin `_` lanza `SwitchExpressionException`; un cliente TypeScript con uniones cerradas, igual). Documenta desde el principio que los enums de salida pueden crecer.
+
+### Estrategias
+
+| Estrategia | Ejemplo | A favor | En contra |
+|---|---|---|---|
+| **Segmento de URL** | `GET /api/v2/barcos/5` | Visible, fácil de probar en navegador y Swagger, fácil de enrutar en un API Gateway | "La URL de un recurso no debería cambiar" (objeción purista) |
+| **Query string** | `GET /api/barcos/5?api-version=2.0` | Sin tocar rutas; es el estilo de las APIs de Azure | Fácil de olvidar; se mezcla con los filtros |
+| **Cabecera** | `X-Api-Version: 2.0` | URLs limpias | Invisible: no se ve en logs de acceso ni se prueba pegando una URL |
+| **Media type** | `Accept: application/json;v=2.0` | El más "REST puro" | El más incómodo para clientes y herramientas |
+
+**En la práctica, la URL es la opción por defecto** en APIs corporativas, y es la que verás casi siempre. La cabecera tiene sentido cuando un gateway o un contrato ya la exige.
+
+### Implementación con `Asp.Versioning`
+
+```bash
+dotnet add package Asp.Versioning.Mvc
+dotnet add package Asp.Versioning.Mvc.ApiExplorer     # integración con Swagger
+```
+
+```csharp
+builder.Services
+    .AddApiVersioning(o =>
+    {
+        o.DefaultApiVersion = new ApiVersion(1, 0);
+        o.AssumeDefaultVersionWhenUnspecified = true;       // peticiones sin versión → v1 (para clientes antiguos)
+        o.ReportApiVersions = true;                         // cabeceras api-supported-versions / api-deprecated-versions
+        o.ApiVersionReader = ApiVersionReader.Combine(
+            new UrlSegmentApiVersionReader(),               // /api/v2/...
+            new HeaderApiVersionReader("X-Api-Version"));   // o por cabecera
+    })
+    .AddMvc()
+    .AddApiExplorer(o =>
+    {
+        o.GroupNameFormat = "'v'VVV";                       // grupos "v1", "v2" para Swagger
+        o.SubstituteApiVersionInUrl = true;
+    });
+```
+
+```csharp
+[ApiController]
+[ApiVersion("1.0", Deprecated = true)]                       // sigue funcionando, pero se anuncia como obsoleta
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+public class BarcosController : ControllerBase
+{
+    // v1: la eslora era un int en metros, y el campo se llamaba "eslora"
+    [HttpGet("{id:long}")]
+    [MapToApiVersion("1.0")]
+    public async Task<ActionResult<BarcoDtoV1>> ObtenerV1(long id, CancellationToken ct) { /* ... */ }
+
+    // v2: eslora decimal con unidades explícitas → cambio incompatible → nueva versión
+    [HttpGet("{id:long}")]
+    [MapToApiVersion("2.0")]
+    public async Task<ActionResult<BarcoDtoV2>> ObtenerV2(long id, CancellationToken ct) { /* ... */ }
+
+    // Sin MapToApiVersion: disponible en ambas versiones
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Eliminar(long id, CancellationToken ct) { /* ... */ }
+}
+```
+
+**Swagger con varias versiones** necesita un documento por versión. `Asp.Versioning.Mvc.ApiExplorer` describe las versiones, y en la UI se añade un desplegable:
+
+```csharp
+app.UseSwaggerUI(o =>
+{
+    foreach (var descripcion in app.DescribeApiVersions())
+        o.SwaggerEndpoint($"/swagger/{descripcion.GroupName}/swagger.json", descripcion.GroupName.ToUpperInvariant());
+});
+// (en AddSwaggerGen se registra un SwaggerDoc por cada versión, normalmente con una clase IConfigureOptions<SwaggerGenOptions>)
+```
+
+> 🧠 **Mentalidad Java → C#:** durante años Spring **no tuvo soporte nativo** de versionado: se hacía a mano con `@RequestMapping("/api/v1/...")`, con `headers = "X-API-VERSION=1"` o con `produces` por media type, cada equipo a su manera. Spring Framework 7 (Spring Boot 4, finales de 2025) incorporó por fin versionado de primera clase. En .NET, `Asp.Versioning` (antes `Microsoft.AspNetCore.Mvc.Versioning`, que verás en proyectos heredados con ese nombre) es el estándar de facto desde hace una década.
+
+> 💡 **Tip — la regla de oro de versionado en la empresa:** una nueva versión **no sustituye a la anterior, convive con ella**. El ciclo típico es: publicar v2 → marcar v1 como `Deprecated = true` (los clientes reciben la cabecera `api-deprecated-versions`) → comunicar una fecha de retirada → medir en los logs quién sigue llamando a v1 → retirarla. Si los logs no permiten saber qué versión llama cada cliente, no puedes retirar nunca nada.
+
+> 💡 **Tip — sistemas SOAP legacy:** en SOAP/WSDL el versionado se hace típicamente con el *namespace* XML (`http://seidel.example/registro/v2`) o publicando un endpoint nuevo (`/RegistroService_v2.svc`). Si una tarea te pide "tocar el servicio viejo", pregunta antes qué clientes lo consumen: la tolerancia a cambios de un cliente SOAP generado con `wsimport` hace diez años es prácticamente nula (un elemento nuevo en la respuesta puede romper la deserialización).
+
+> ⚠️ **Cuidado:** con versión en la URL, `AssumeDefaultVersionWhenUnspecified` **no** hace que `/api/barcos` funcione: esa ruta simplemente no existe, porque la plantilla exige `v{version}`. Si tienes clientes que ya llaman sin versión, añade una segunda ruta `[Route("api/[controller]")]` en los controladores de v1 durante la transición.
+
+---
+
+## 13.2 Health checks
+
+### Qué son y por qué los necesita la plataforma
+
+Un **health check** es un endpoint que responde a la pregunta "¿esta instancia está en condiciones de atender tráfico?". No lo consume una persona: lo consume **la plataforma de despliegue**, cada pocos segundos, para tomar decisiones automáticas:
+
+| Plataforma | Qué hace con el health check |
+|---|---|
+| **Azure App Service** (opción *Health check* en el portal) | Si una instancia falla repetidamente, la saca del balanceador y, si no se recupera, la reemplaza |
+| **AWS ALB / Target Groups** (EC2, ECS) | Deja de enviar tráfico a los *targets* que fallan; ECS sustituye las tareas enfermas |
+| **Kubernetes** (AKS, EKS) | `livenessProbe` → reinicia el contenedor; `readinessProbe` → lo quita del Service; `startupProbe` → espera a que arranque |
+| **Monitorización** (Azure Monitor, CloudWatch, Uptime Kuma) | Alerta a una persona cuando algo lleva X minutos mal |
+
+Sin health check, la plataforma solo sabe si el proceso existe. Una API que arranca pero no llega a la base de datos devuelve 500 a todo el mundo **y el balanceador sigue enviándole tráfico**.
+
+### Liveness vs readiness: la distinción que evita desastres
+
+- **Liveness** ("¿el proceso está vivo?"): responde si la app no está colgada. **No debe comprobar dependencias externas.**
+- **Readiness** ("¿puedo atender peticiones ahora?"): comprueba base de datos, servicios de los que dependo, etc.
+
+> ⚠️ **Cuidado — el error que convierte una incidencia pequeña en una caída total:** si el *liveness* comprueba la base de datos y la base de datos tiene un corte de 30 segundos, la plataforma considera muertas **todas** las instancias a la vez y **las reinicia todas**. Cuando la BD vuelve, las instancias están arrancando, con la caché fría, y reciben de golpe todo el tráfico acumulado. El liveness nunca debe depender de nada externo; eso es trabajo del readiness, cuyo fallo solo retira la instancia del balanceador sin reiniciarla.
+
+### Implementación
+
+```bash
+dotnet add package Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore
+```
+
+```csharp
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<MarinaDbContext>("base-de-datos", tags: ["ready"])            // ejecuta un CanConnectAsync
+    .AddCheck<RegistroMaritimoHealthCheck>("registro-maritimo-soap", tags: ["ready"]);
+
+var app = builder.Build();
+
+// Liveness: ningún check (Predicate = false) → 200 si el proceso responde
+app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+
+// Readiness: solo los checks etiquetados "ready"
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready"),
+    ResponseWriter = EscribirInformeJson
+});
+```
+
+**Un health check propio**, por ejemplo para el servicio SOAP legacy:
+
+```csharp
+public class RegistroMaritimoHealthCheck : IHealthCheck
+{
+    private readonly IRegistroMaritimoClient _cliente;
+
+    public RegistroMaritimoHealthCheck(IRegistroMaritimoClient cliente) => _cliente = cliente;
+
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct = default)
+    {
+        var cronometro = Stopwatch.StartNew();
+        try
+        {
+            await _cliente.PingAsync(ct);
+            return cronometro.ElapsedMilliseconds > 2000
+                ? HealthCheckResult.Degraded($"El registro marítimo responde lento ({cronometro.ElapsedMilliseconds} ms).")
+                : HealthCheckResult.Healthy();
+        }
+        catch (Exception ex)
+        {
+            // Degraded y no Unhealthy: sin el registro, la API sigue sirviendo el 90% de sus endpoints
+            return HealthCheckResult.Degraded("Registro marítimo no disponible.", ex);
+        }
+    }
+}
+```
+
+**Salida en JSON** (por defecto la respuesta es solo el texto `Healthy`, `Degraded` o `Unhealthy`):
+
+```csharp
+static Task EscribirInformeJson(HttpContext ctx, HealthReport informe)
+{
+    ctx.Response.ContentType = "application/json";
+    return ctx.Response.WriteAsJsonAsync(new
+    {
+        estado = informe.Status.ToString(),
+        duracionMs = informe.TotalDuration.TotalMilliseconds,
+        comprobaciones = informe.Entries.Select(e => new
+        {
+            nombre = e.Key,
+            estado = e.Value.Status.ToString(),
+            descripcion = e.Value.Description,
+            duracionMs = e.Value.Duration.TotalMilliseconds
+        })
+    });
+}
+```
+
+```json
+{
+  "estado": "Degraded",
+  "duracionMs": 2140.6,
+  "comprobaciones": [
+    { "nombre": "base-de-datos", "estado": "Healthy", "descripcion": null, "duracionMs": 12.3 },
+    { "nombre": "registro-maritimo-soap", "estado": "Degraded", "descripcion": "El registro marítimo responde lento (2127 ms).", "duracionMs": 2127.9 }
+  ]
+}
+```
+
+| Estado | Código HTTP por defecto | Qué decide la plataforma |
+|---|---|---|
+| `Healthy` | 200 | Todo bien |
+| `Degraded` | 200 | Sigue recibiendo tráfico (pero tu monitorización puede alertar) |
+| `Unhealthy` | 503 | Se retira del balanceador |
+
+> 🧠 **Mentalidad Java → C#:** el equivalente directo es **Spring Boot Actuator**: `/actuator/health`, los `HealthIndicator` propios (aquí `IHealthCheck`) y los grupos `liveness`/`readiness` (aquí, las etiquetas + `Predicate`). La diferencia: Actuator detecta solo el `DataSource` y te da el check de BD sin escribir nada; en .NET lo registras explícitamente. Para PostgreSQL, MySQL, Redis, RabbitMQ, Azure Blob, etc., existe la colección de la comunidad **AspNetCore.Diagnostics.HealthChecks** (paquetes `AspNetCore.HealthChecks.NpgSql`, `...MySql`, `...Redis`...), que es el equivalente a los indicadores automáticos de Actuator.
+
+> ⚠️ **Cuidado — no regales información:** un `/health/ready` público con el JSON detallado le cuenta a cualquiera qué base de datos usas, qué sistemas externos tienes y cuánto tardan. Deja público solo el mínimo que necesita el balanceador (el código de estado) y protege el detalle: `.RequireAuthorization()`, `.RequireHost("*:8081")` para servirlo en un puerto interno, o restricción por red en el propio Azure/AWS.
+
+> ⚠️ **Cuidado:** un health check **se ejecuta muchas veces por minuto** por cada instancia. No hagas en él consultas pesadas (`SELECT COUNT(*) FROM Movimientos`) ni llamadas que cuesten dinero (APIs de pago por petición). `AddDbContextCheck` solo abre conexión, que es lo adecuado. Y si usas imágenes Docker *chiseled* de .NET 8, recuerda que **no incluyen `curl`**: un `HEALTHCHECK CMD curl ...` en el Dockerfile fallará siempre; usa el health check de la plataforma (App Service, ALB, Kubernetes) en su lugar.
+
+---
+
+## 13.3 Errores globales en .NET 8: IExceptionHandler y ProblemDetails
+
+La [[#10.6 Middleware: tratamiento global de errores|Lección 10.6]] (y el `ExceptionHandlingMiddleware` de MarinaApi) resuelven el tratamiento global de errores con un middleware escrito a mano. Es correcto y lo verás en muchos proyectos. Desde .NET 8 hay una forma **integrada en el framework** que conviene reconocer, porque es la que traen las plantillas y los proyectos nuevos:
+
+```csharp
+public sealed class ManejadorExcepcionesGlobal : IExceptionHandler
+{
+    private readonly IProblemDetailsService _problemDetails;
+    private readonly ILogger<ManejadorExcepcionesGlobal> _logger;
+
+    public ManejadorExcepcionesGlobal(IProblemDetailsService problemDetails, ILogger<ManejadorExcepcionesGlobal> logger)
+    {
+        _problemDetails = problemDetails;
+        _logger = logger;
+    }
+
+    public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken ct)
+    {
+        var (estado, titulo) = exception switch
+        {
+            NotFoundException                    => (StatusCodes.Status404NotFound, "Recurso no encontrado"),
+            ConflictException                    => (StatusCodes.Status409Conflict, "Conflicto con el estado actual"),
+            OperationCanceledException when httpContext.RequestAborted.IsCancellationRequested
+                                                 => (StatusCodes.Status499ClientClosedRequest, "Petición cancelada por el cliente"),
+            _                                    => (StatusCodes.Status500InternalServerError, "Error interno")
+        };
+
+        if (estado == StatusCodes.Status500InternalServerError)
+            _logger.LogError(exception, "Error no controlado en {Metodo} {Ruta}", httpContext.Request.Method, httpContext.Request.Path);
+
+        httpContext.Response.StatusCode = estado;
+
+        return await _problemDetails.TryWriteAsync(new ProblemDetailsContext
+        {
+            HttpContext = httpContext,
+            Exception = exception,
+            ProblemDetails = new ProblemDetails
+            {
+                Status = estado,
+                Title = titulo,
+                Detail = estado == StatusCodes.Status500InternalServerError
+                    ? "Ha ocurrido un error inesperado."       // nunca el mensaje real de un 500
+                    : exception.Message
+            }
+        });
+    }
+}
+```
+
+```csharp
+// Program.cs
+builder.Services.AddProblemDetails(o =>
+    o.CustomizeProblemDetails = ctx =>
+        ctx.ProblemDetails.Extensions["traceId"] = Activity.Current?.Id ?? ctx.HttpContext.TraceIdentifier);
+
+builder.Services.AddExceptionHandler<ManejadorExcepcionesGlobal>();
+
+var app = builder.Build();
+app.UseExceptionHandler();        // sin argumentos: usa los IExceptionHandler registrados
+app.UseStatusCodePages();         // opcional: los 404/405 "vacíos" del routing también salen como ProblemDetails
+```
+
+**Qué ganas frente al middleware a mano:** `AddProblemDetails` hace que **todas** las respuestas de error del framework (validación automática, 404 de rutas, 405, errores de tus controladores) usen el mismo formato RFC 7807 y lleven el `traceId` para buscarlas en los logs. Se pueden registrar varios `IExceptionHandler` y se ejecutan en orden hasta que uno devuelva `true`.
+
+> 💡 **Tip — cómo encaja con la Lección 12.3:** el Result pattern y este manejador **no compiten, se reparten el trabajo**. Los errores esperados salen como `Result` y el controlador los convierte con `Problem(...)`; lo inesperado (BD caída, un bug) llega aquí como excepción. Como ambos caminos producen `ProblemDetails`, el cliente recibe siempre el mismo formato.
+
+> 💡 **Tip:** el caso `OperationCanceledException` evita un clásico: el usuario cierra la pestaña a mitad de una consulta larga, el `CancellationToken` cancela la operación (bien) y tu log se llena de errores 500 que no son errores (mal). Con el código 499 y sin `LogError`, desaparecen del ruido de alertas.
+
+> 🧠 **Mentalidad Java → C#:** `IExceptionHandler` + `AddProblemDetails` es el equivalente de `@RestControllerAdvice` + `ResponseEntityExceptionHandler` con `spring.mvc.problemdetails.enabled=true` (Spring 6). Mismo estándar RFC 7807 (actualizado como RFC 9457), mismo propósito.
+
+---
+
+## 13.4 Llamadas a sistemas externos: HttpClientFactory y resiliencia
+
+Tu API no vive sola: llama a un servicio de pagos, a una API de meteorología para las regatas, al registro marítimo SOAP de hace quince años. **Todos ellos van a fallar** alguna vez: timeouts, 503 de mantenimiento, cortes de red de dos segundos. Un backend robusto asume el fallo y lo gestiona.
+
+### Paso 1 — No crear `HttpClient` a mano
+
+```csharp
+// ❌ Agotamiento de sockets: cada instancia deja una conexión en TIME_WAIT durante minutos
+using var http = new HttpClient();
+var respuesta = await http.GetAsync("https://api.meteo.example/regatas");
+
+// ❌ HttpClient estático para toda la vida de la app: no se entera de cambios de DNS (conmutación a otra región)
+private static readonly HttpClient Http = new();
+```
+
+```csharp
+// ✅ Typed client con IHttpClientFactory: gestiona el pool de conexiones y las rota
+builder.Services.AddHttpClient<IMeteoClient, MeteoClient>(c =>
+{
+    c.BaseAddress = new Uri(builder.Configuration["Meteo:BaseUrl"]!);
+    c.DefaultRequestHeaders.Add("X-Api-Key", builder.Configuration["Meteo:ApiKey"]);
+});
+
+public class MeteoClient : IMeteoClient
+{
+    private readonly HttpClient _http;                   // lo inyecta la factoría, ya configurado
+    public MeteoClient(HttpClient http) => _http = http;
+
+    public async Task<PrevisionViento?> ObtenerPrevisionAsync(string puerto, CancellationToken ct) =>
+        await _http.GetFromJsonAsync<PrevisionViento>($"previsiones/{Uri.EscapeDataString(puerto)}", ct);
+}
+```
+
+### Paso 2 — Reintentos, timeouts y circuit breaker
+
+```bash
+dotnet add package Microsoft.Extensions.Http.Resilience
+```
+
+```csharp
+builder.Services.AddHttpClient<IMeteoClient, MeteoClient>(c => { /* ... */ })
+    .AddStandardResilienceHandler(o =>
+    {
+        o.Retry.MaxRetryAttempts = 3;                                 // reintento con backoff exponencial + jitter
+        o.AttemptTimeout.Timeout = TimeSpan.FromSeconds(5);           // cada intento, como mucho 5 s
+        o.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(20);     // la operación completa, como mucho 20 s
+        o.CircuitBreaker.BreakDuration = TimeSpan.FromSeconds(30);    // si falla mucho, deja de llamar 30 s
+    });
+```
+
+Con una sola línea (`AddStandardResilienceHandler()`) ya obtienes una configuración sensata de las cinco estrategias. Qué hace cada una:
+
+| Estrategia | Problema que resuelve |
+|---|---|
+| **Retry** | Fallos transitorios (un 503 puntual, un corte de red de 1 s). Solo reintenta errores transitorios: 5xx, 408, 429, timeouts |
+| **Attempt timeout** | Un intento que se queda colgado no bloquea para siempre el hilo ni la petición del usuario |
+| **Total timeout** | La suma de reintentos no supera lo que el usuario está dispuesto a esperar |
+| **Circuit breaker** | Si el servicio externo está caído del todo, dejar de martillearlo: fallar al instante durante un tiempo en vez de esperar 20 s en cada petición (y ayudar a que se recupere) |
+| **Rate limiter** | No superar la cuota de llamadas que te permite el proveedor |
+
+> ⚠️ **Cuidado — reintentar un POST puede cobrar dos veces.** Si la primera llamada a "crear pago" llegó al servidor, se procesó y lo que falló fue la respuesta, el reintento crea **otro** pago. Reintenta sin miedo los métodos idempotentes (GET, PUT, DELETE); para POST, desactívalo (`o.Retry.DisableForUnsafeHttpMethods()`) o usa una **clave de idempotencia** (`Idempotency-Key: <guid>`) si el proveedor la soporta.
+
+### ¿Y el servicio SOAP?
+
+Un cliente generado con `dotnet-svcutil` no usa `IHttpClientFactory`, así que la resiliencia se aplica envolviendo la llamada con un *pipeline* de **Polly** (la librería sobre la que está construido todo lo anterior):
+
+```csharp
+builder.Services.AddResiliencePipeline("registro-maritimo", pipeline => pipeline
+    .AddRetry(new RetryStrategyOptions
+    {
+        MaxRetryAttempts = 2,
+        BackoffType = DelayBackoffType.Exponential,
+        ShouldHandle = new PredicateBuilder().Handle<CommunicationException>().Handle<TimeoutException>()
+    })
+    .AddTimeout(TimeSpan.FromSeconds(10)));
+
+public class RegistroMaritimoSoapClient : IRegistroMaritimoClient
+{
+    private readonly ResiliencePipeline _pipeline;
+    private readonly RegistroMaritimoPortTypeClient _soap;
+
+    public RegistroMaritimoSoapClient(ResiliencePipelineProvider<string> pipelines, RegistroMaritimoPortTypeClient soap)
+    {
+        _pipeline = pipelines.GetPipeline("registro-maritimo");
+        _soap = soap;
+    }
+
+    public async Task<MatriculaOficial?> ConsultarMatriculaAsync(string matricula, CancellationToken ct) =>
+        await _pipeline.ExecuteAsync(async token =>
+        {
+            var respuesta = await _soap.CONSULTA_MATRICULAAsync(new CONSULTA_MATRICULA_REQ { MATRICULA = matricula });
+            return Traducir(respuesta);                  // la capa anticorrupción de la Lección 11.3
+        }, ct);
+}
+```
+
+> 🧠 **Mentalidad Java → C#:** **Polly** es a .NET lo que **Resilience4j** (o Spring Retry) es a Spring: mismas estrategias (`@Retry`, `@CircuitBreaker`, `@TimeLimiter`, `@RateLimiter`), mismos conceptos. La diferencia de estilo: en Spring se aplican con anotaciones sobre el método; en .NET se configuran al registrar el cliente o como un pipeline explícito. Y `IHttpClientFactory` cubre lo que en Spring haces declarando un único `RestClient`/`WebClient` como bean.
+
+> ⚠️ **Cuidado:** la [[#11.5 Captive dependency en profundidad|captive dependency de la Lección 11.5]] también aplica aquí. Un *typed client* se registra como **Transient**; si lo inyectas en un Singleton, su `HttpClient` queda cautivo y pierde la rotación de conexiones. Desde un Singleton, inyecta `IHttpClientFactory` y llama a `CreateClient("nombre")` en cada operación.
+
+---
+
+## 13.5 Trabajo en segundo plano: BackgroundService
+
+"Liberar cada hora los amarres cuya reserva ha caducado", "reenviar los correos que fallaron", "sincronizar cada noche con el sistema legacy". Todo backend real acaba teniendo tareas que no dependen de una petición HTTP.
+
+```csharp
+public class LiberarAmarresCaducadosJob : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<LiberarAmarresCaducadosJob> _logger;
+
+    public LiberarAmarresCaducadosJob(IServiceScopeFactory scopeFactory, ILogger<LiberarAmarresCaducadosJob> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var temporizador = new PeriodicTimer(TimeSpan.FromHours(1));
+
+        while (await temporizador.WaitForNextTickAsync(stoppingToken))
+        {
+            try
+            {
+                // BackgroundService es Singleton: cada ejecución crea su propio scope (Lección 11.5, solución 2)
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                var servicio = scope.ServiceProvider.GetRequiredService<IAmarreService>();
+
+                var liberados = await servicio.LiberarCaducadosAsync(stoppingToken);
+                _logger.LogInformation("Liberados {Cantidad} amarres caducados", liberados);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Sin este catch, una excepción detiene la aplicación ENTERA (comportamiento por defecto desde .NET 6)
+                _logger.LogError(ex, "Error liberando amarres caducados; se reintentará en la próxima ejecución");
+            }
+        }
+    }
+}
+
+// Program.cs
+builder.Services.AddHostedService<LiberarAmarresCaducadosJob>();
+```
+
+> 🧠 **Mentalidad Java → C#:** es el equivalente de un método `@Scheduled(fixedRate = 3600000)` en un `@Component`. Dos diferencias importantes: en .NET no hay anotación, escribes el bucle con `PeriodicTimer`; y en Spring el bean programado recibe repositorios inyectados sin problema (son proxies thread-safe), mientras que en .NET **tienes que crear un scope** para obtener un `DbContext`. Olvidarlo es la *captive dependency* de manual.
+
+> ⚠️ **Cuidado — con varias instancias, el job se ejecuta varias veces.** En local tienes una instancia; en Azure App Service con escalado a 3 instancias, o en ECS con 3 tareas, **cada una** ejecuta su `BackgroundService` y el job corre tres veces a la vez. Para una tarea idempotente puede dar igual; para "enviar la factura mensual", no. Opciones: **Hangfire** o **Quartz.NET** en modo clúster (usan la base de datos como candado), mover la tarea a un servicio dedicado (**Azure Functions** con *timer trigger*, **AWS Lambda** con **EventBridge Scheduler**, un *WebJob*), o un candado distribuido. Es el mismo problema que en Spring se resuelve con **ShedLock**.
+
+> ⚠️ **Cuidado:** en Azure App Service, si la opción **Always On** está desactivada (lo está por defecto en los planes básicos), la aplicación se descarga tras un rato sin peticiones y **tus `BackgroundService` dejan de ejecutarse** sin ningún error. Si el job "a veces no corre por la noche", mira eso lo primero.
+
+---
+
+## 13.6 Checklist de producción
+
+Lo que se revisa antes de que una API pase a producción, con dónde se trata cada punto en esta guía. Úsala como lista literal cuando prepares tu primer despliegue.
+
+| Área | Qué comprobar | Dónde |
+|---|---|---|
+| **Arquitectura** | La regla de dependencia se cumple; DI validada al arrancar (`ValidateOnBuild`) | 11.2, 11.5, 11.6 |
+| **Datos** | Un único `SaveChangesAsync` por caso de uso; reintentos transitorios con `CreateExecutionStrategy` | 12.1 |
+| **Errores** | Todas las respuestas de error en `ProblemDetails` con `traceId`; sin stack traces al cliente | 12.3, 13.3 |
+| **Validación** | Entrada validada en servidor; unicidad respaldada por índice único | 12.4 |
+| **Contrato** | Versionado desde la v1, aunque solo haya una | 13.1 |
+| **Operación** | `/health/live` y `/health/ready` configurados en la plataforma | 13.2 |
+| **Dependencias externas** | `IHttpClientFactory` + timeouts + reintentos solo en métodos idempotentes | 13.4 |
+| **Jobs** | Scope por ejecución; qué pasa con N instancias | 13.5 |
+| **Logs** | Logging estructurado, sin datos sensibles, nivel adecuado por entorno | [[#Lección 15: Logging y Configuración en .NET\|Lección 15]] |
+| **Secretos** | Nada en `appsettings.json`; Azure Key Vault / AWS Secrets Manager | [[#Lección 15: Logging y Configuración en .NET\|Lección 15]] |
+| **Tests** | Tests unitarios de dominio y servicios; al menos un test de integración que arranque la app | [[#Lección 14: Testing con xUnit y Moq\|Lección 14]] |
+
+Y cinco puntos más que no tienen sección propia pero se preguntan siempre:
+
+**1. CORS restringido.** MarinaApi usa `AllowAnyOrigin()`, válido para desarrollo. En producción, lista explícita:
+
+```csharp
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p
+    .WithOrigins(builder.Configuration.GetSection("Cors:Origenes").Get<string[]>() ?? [])
+    .WithMethods("GET", "POST", "PUT", "DELETE")
+    .AllowAnyHeader()));
+```
+
+**2. Rate limiting** (integrado desde .NET 7), para que un cliente con un bucle infinito no tumbe la API a todos los demás:
+
+```csharp
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    o.AddFixedWindowLimiter("por-defecto", l => { l.PermitLimit = 100; l.Window = TimeSpan.FromMinutes(1); });
+});
+
+app.UseRateLimiter();
+app.MapControllers().RequireRateLimiting("por-defecto");
+```
+
+**3. Detrás de un balanceador, cabeceras reenviadas.** En Azure App Service y AWS ALB, el HTTPS termina en el balanceador y tu app recibe HTTP. Sin `UseForwardedHeaders`, `UseHttpsRedirection` puede entrar en bucle de redirecciones, y `Request.Scheme` y la IP del cliente son incorrectos:
+
+```csharp
+builder.Services.Configure<ForwardedHeadersOptions>(o =>
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+
+app.UseForwardedHeaders();      // lo PRIMERO del pipeline
+```
+
+**4. Migraciones fuera del arranque.** `context.Database.Migrate()` en `Program.cs` es cómodo en local y peligroso con varias instancias (tres instancias arrancando a la vez intentan migrar a la vez). En producción, las migraciones se aplican **en el pipeline de despliegue**, con un script idempotente o un *bundle*:
+
+```bash
+dotnet ef migrations script --idempotent -o migraciones.sql     # SQL revisable, que puede aplicar un DBA
+dotnet ef migrations bundle -o efbundle                         # ejecutable autónomo para CI/CD
+```
+
+**5. Observabilidad con OpenTelemetry**, el estándar abierto que entienden Azure Monitor / Application Insights, AWS X-Ray/CloudWatch, Grafana y Datadog. Con él, una petición lenta se sigue de punta a punta: controlador → SQL → llamada HTTP externa:
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("marina-api"))
+    .WithTracing(t => t
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter())
+    .WithMetrics(m => m
+        .AddAspNetCoreInstrumentation()
+        .AddOtlpExporter());
+```
+
+> 🧠 **Mentalidad Java → C#:** es el mismo OpenTelemetry que en Java (donde además existe el *agente* que instrumenta sin tocar código, o Micrometer Tracing en Spring Boot 3). En .NET, `ILogger`, `Activity` y `Meter` están integrados en el runtime, y OpenTelemetry simplemente los exporta; no hace falta ningún agente.
+
+> ⚠️ **Cuidado — lo que esta lección deja fuera a propósito:** **autenticación y autorización** (JWT, OAuth2/OpenID Connect, Microsoft Entra ID, políticas de autorización). Es imprescindible en producción, pero es una familia de temas distinta —seguridad— y merece su propia lección. Si en las prácticas te toca, pregunta primero qué proveedor de identidad usa el proyecto: casi nunca se implementa desde cero.
+
+---
+
+## 13.7 Ejercicios Lección 13
+
+1. Añade `Asp.Versioning.Mvc` a MarinaApi con versión por URL. Crea una v2 de `GET /api/v2/barcos/{id}` que devuelva la eslora como `decimal` con un campo `unidad`, y marca la v1 como obsoleta. Comprueba las cabeceras `api-supported-versions` y `api-deprecated-versions` con Swagger o `curl -i`.
+2. Clasifica como compatible o incompatible: renombrar `capacidad` a `plazas`; añadir `fechaAlta` a la respuesta; hacer obligatorio `tipo` en el POST; añadir el valor `"Kayak"` al enum de tipos de la respuesta.
+3. Añade `/health/live` y `/health/ready` a MarinaApi con `AddDbContextCheck`. Para el contenedor de SQL Server de `docker-compose.yml` y comprueba que `live` sigue en 200 y `ready` pasa a 503.
+4. Escribe un `IHealthCheck` propio que devuelva `Degraded` si una consulta sencilla tarda más de 500 ms, y un `ResponseWriter` en JSON.
+5. Sustituye `ExceptionHandlingMiddleware` por un `IExceptionHandler` + `AddProblemDetails`. Verifica que un 404 de una ruta inexistente y un `ConflictException` salen con el mismo formato y con `traceId`.
+6. Crea un typed client para cualquier API pública gratuita, añade `AddStandardResilienceHandler` y simula fallos (URL incorrecta, timeout muy bajo). Observa en los logs los reintentos y la apertura del circuit breaker.
+7. Implementa `LiberarAmarresCaducadosJob` con `PeriodicTimer` cada minuto (para probar), provocando una excepción en la segunda ejecución. Comprueba que, con el `catch`, la app sigue viva; sin él, se detiene.
+8. Explica por escrito qué ocurriría con el job del ejercicio 7 si MarinaApi se desplegara con 3 instancias, y qué opción de 13.5 elegirías.
+9. Recorre la checklist de 13.6 sobre MarinaApi y apunta qué puntos cumple, cuáles no y cuál arreglarías primero. Es una buena lista para llevar a una conversación con tu tutor de prácticas.
+
+---
+
+# Lección 14: Testing con xUnit y Moq
 
 [[#Índice|↑ Volver al índice]]
 
@@ -2996,7 +4860,7 @@ En la Lección 6 viste *por qué* Repository + DI hacen el código testeable. Es
 
 ---
 
-## 11.1 Estructura: un proyecto de tests aparte
+## 14.1 Estructura: un proyecto de tests aparte
 
 ```bash
 dotnet new xunit -n MiApi.Tests            # proyecto de tests
@@ -3009,7 +4873,7 @@ La convención es `<Proyecto>.Tests`, exactamente como el `MarinaApi.Tests` que 
 
 ---
 
-## 11.2 Arrange - Act - Assert
+## 14.2 Arrange - Act - Assert
 
 Todo test tiene tres partes, y conviene separarlas visualmente:
 
@@ -3041,7 +4905,7 @@ public class LibroServicioTests
 
 ---
 
-## 11.3 `[Theory]` — el mismo test con muchos datos
+## 14.3 `[Theory]` — el mismo test con muchos datos
 
 ```csharp
 [Theory]
@@ -3057,11 +4921,11 @@ public void EsAntiguo_SegunElAnio_DevuelveLoEsperado(int anio, bool esperado)
 
 Cada `[InlineData]` es un caso de prueba **independiente**: si uno falla, ves exactamente cuál, y los demás siguen ejecutándose.
 
-> 💡 **Tip:** cuando estimes tareas (Lección 14), la pregunta "¿y los casos límite?" se responde sola con un `[Theory]`: cero, negativo, null, cadena vacía, el valor justo en la frontera. Es donde viven la mayoría de los bugs reales.
+> 💡 **Tip:** cuando estimes tareas (Lección 17), la pregunta "¿y los casos límite?" se responde sola con un `[Theory]`: cero, negativo, null, cadena vacía, el valor justo en la frontera. Es donde viven la mayoría de los bugs reales.
 
 ---
 
-## 11.4 Asserts habituales
+## 14.4 Asserts habituales
 
 ```csharp
 Assert.Equal(esperado, obtenido);          // ¡esperado PRIMERO! (al revés que en algunos frameworks)
@@ -3083,7 +4947,7 @@ Assert.Contains("ya está prestado", ex.Message);
 
 ---
 
-## 11.5 Moq en profundidad
+## 14.5 Moq en profundidad
 
 ```csharp
 var repo = new Mock<ILibroRepositorio>();
@@ -3114,7 +4978,7 @@ repo.Verify(r => r.EliminarAsync(It.IsAny<int>()), Times.Never);
 
 ---
 
-## 11.6 Fixtures: compartir preparación entre tests
+## 14.6 Fixtures: compartir preparación entre tests
 
 ```csharp
 // Se crea UNA vez y se comparte entre todos los tests de la clase
@@ -3151,7 +5015,7 @@ public class LibroRepositorioTests : IClassFixture<BaseDatosFixture>
 
 ---
 
-## 11.7 Qué testear (y qué no)
+## 14.7 Qué testear (y qué no)
 
 | Testea | No pierdas el tiempo testeando |
 |---|---|
@@ -3168,7 +5032,7 @@ public class LibroRepositorioTests : IClassFixture<BaseDatosFixture>
 
 ---
 
-## 11.8 Ejercicios Lección 11
+## 14.8 Ejercicios Lección 14
 
 1. Crea un proyecto `MiApi.Tests` con xUnit y añádele la referencia al proyecto principal y el paquete Moq.
 2. Escribe tres tests de `GestorPrestamos` usando `Mock<ILibroRepositorio>`: caso correcto, libro no encontrado y libro ya prestado.
@@ -3182,7 +5046,7 @@ public class LibroRepositorioTests : IClassFixture<BaseDatosFixture>
 
 ---
 
-# Lección 12: Logging y Configuración en .NET
+# Lección 15: Logging y Configuración en .NET
 
 [[#Índice|↑ Volver al índice]]
 
@@ -3190,7 +5054,7 @@ Dos temas que nunca aparecen en un tutorial y que son de las primeras cosas que 
 
 ---
 
-## 12.1 `ILogger<T>` — logging integrado
+## 15.1 `ILogger<T>` — logging integrado
 
 No hace falta instalar nada: el logging viene en el framework y se inyecta como cualquier otra dependencia.
 
@@ -3264,7 +5128,7 @@ Con la segunda forma, el sistema de logs guarda **el mensaje y el dato por separ
 
 ---
 
-## 12.2 `appsettings.json` e `IConfiguration`
+## 15.2 `appsettings.json` e `IConfiguration`
 
 ```json
 // appsettings.json
@@ -3312,7 +5176,7 @@ El entorno lo determina la variable `ASPNETCORE_ENVIRONMENT` (`Development`, `St
 
 ---
 
-## 12.3 Options pattern — configuración tipada
+## 15.3 Options pattern — configuración tipada
 
 Leer la configuración con cadenas mágicas (`_config["Biblioteca:DiasPrestamo"]`) funciona, pero es frágil: sin tipos, sin autocompletado, y un error tipográfico no se detecta hasta que falla en tiempo de ejecución. La forma profesional es mapear la sección a una clase:
 
@@ -3360,7 +5224,7 @@ public class LibroServicio
 
 ---
 
-## 12.4 Cómo se ve todo junto
+## 15.4 Cómo se ve todo junto
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
@@ -3387,7 +5251,7 @@ app.Run();
 
 ---
 
-## 12.5 Ejercicios Lección 12
+## 15.5 Ejercicios Lección 15
 
 1. Inyecta `ILogger<T>` en tu `LibroServicio` y añade logs de `Information`, `Warning` y `Error` en los puntos adecuados.
 2. Reescribe un log con interpolación `$"..."` a plantilla estructurada `"... {Dato}", dato` y explica por escrito qué se gana.
@@ -3401,11 +5265,11 @@ app.Run();
 
 ---
 
-# Lección 13: Git Avanzado
+# Lección 16: Git Avanzado
 
 [[#Índice|↑ Volver al índice]]
 
-## 13.1 Git Flow — el modelo de ramas estándar en empresa
+## 16.1 Git Flow — el modelo de ramas estándar en empresa
 
 ```
 main (producción)
@@ -3425,7 +5289,7 @@ main (producción)
 
 ---
 
-## 13.2 Comandos básicos de repaso
+## 16.2 Comandos básicos de repaso
 
 ```bash
 git init                          # crear un repo nuevo
@@ -3447,7 +5311,7 @@ git log --oneline                 # historial compacto de commits
 
 ---
 
-## 13.3 Crear y trabajar con ramas
+## 16.3 Crear y trabajar con ramas
 
 ```bash
 git branch -a                                    # ver todas las ramas (locales y remotas)
@@ -3487,7 +5351,7 @@ git commit -m "fix: corregir cálculo de IVA en el total del pedido"
 
 ---
 
-## 13.4 Pull Requests (PRs) — el flujo real en equipo
+## 16.4 Pull Requests (PRs) — el flujo real en equipo
 
 Un pull request es una solicitud para fusionar tu rama en otra (normalmente `develop`).
 
@@ -3516,7 +5380,7 @@ Un pull request es una solicitud para fusionar tu rama en otra (normalmente `dev
 
 ---
 
-## 13.5 Mergear ramas localmente
+## 16.5 Mergear ramas localmente
 
 ```bash
 git checkout develop
@@ -3543,7 +5407,7 @@ git push origin develop
 
 ---
 
-## 13.6 Rebase — alternativa más limpia a merge
+## 16.6 Rebase — alternativa más limpia a merge
 
 ```bash
 git checkout feature/autenticacion
@@ -3568,7 +5432,7 @@ git push origin feature/autenticacion --force-with-lease
 
 ---
 
-## 13.7 Deshacer cambios
+## 16.7 Deshacer cambios
 
 ```bash
 git restore archivo.cs                    # descartar cambios no confirmados en un archivo
@@ -3586,7 +5450,7 @@ git revert <hash-del-commit>              # crear un commit nuevo que deshace un
 
 ---
 
-## 13.8 Etiquetas (tags) para versiones
+## 16.8 Etiquetas (tags) para versiones
 
 ```bash
 git tag -a v1.0.0 -m "Release version 1.0.0"
@@ -3597,7 +5461,7 @@ git checkout v1.0.0            # ver el código exacto de esa versión
 
 ---
 
-## 13.9 Buscando en el historial
+## 16.9 Buscando en el historial
 
 ```bash
 git log archivo.cs                              # commits que tocaron un archivo concreto
@@ -3609,7 +5473,7 @@ git diff develop feature/autenticacion            # diferencias entre dos ramas
 
 ---
 
-## 13.10 .gitignore — qué no subir al repositorio
+## 16.10 .gitignore — qué no subir al repositorio
 
 ```
 # .gitignore típico para un proyecto .NET
@@ -3624,7 +5488,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ---
 
-## 13.11 Ejercicios Lección 13
+## 16.11 Ejercicios Lección 16
 
 1. Crea una rama `feature/nueva-funcionalidad` desde `develop`
 2. Haz 3 commits con mensajes siguiendo Conventional Commits
@@ -3637,11 +5501,11 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ---
 
-# Lección 14: Scrum y Agile
+# Lección 17: Scrum y Agile
 
 [[#Índice|↑ Volver al índice]]
 
-## 14.1 ¿Qué es Scrum?
+## 17.1 ¿Qué es Scrum?
 
 **Scrum** es un marco de trabajo ágil para gestionar proyectos complejos mediante ciclos cortos e iterativos llamados **sprints**. En vez de planificar todo el proyecto de golpe (modelo "cascada"), el equipo entrega software funcionando cada 1-2 semanas y ajusta el rumbo según feedback real.
 
@@ -3649,7 +5513,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ---
 
-## 14.2 Roles
+## 17.2 Roles
 
 | Rol | Responsabilidad |
 |---|---|
@@ -3661,7 +5525,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ---
 
-## 14.3 Artefactos (Artifacts)
+## 17.3 Artefactos (Artifacts)
 
 | Artefacto | Qué es | Ejemplo |
 |---|---|---|
@@ -3671,7 +5535,7 @@ Nunca se sube al repositorio: binarios compilados (`bin/`, `obj/`), configuraci�
 
 ---
 
-## 14.4 El ciclo de un Sprint
+## 17.4 El ciclo de un Sprint
 
 Un sprint dura típicamente **1-2 semanas** (2 semanas es lo más común en entornos empresariales, incluido probablemente Espiral MS).
 
@@ -3738,7 +5602,7 @@ Acciones para el próximo sprint:
 
 ---
 
-## 14.5 Story Points y estimación
+## 17.5 Story Points y estimación
 
 Scrum no estima en horas exactas, sino en **complejidad relativa** usando Story Points. Escala típica (Fibonacci): **1, 2, 3, 5, 8, 13, 21**
 
@@ -3778,7 +5642,7 @@ Este proceso es valioso no tanto por el número final, sino porque **obliga a di
 
 ---
 
-## 14.6 Velocidad del equipo (Velocity)
+## 17.6 Velocidad del equipo (Velocity)
 
 La **velocidad** es la cantidad de story points que el equipo completa, de media, por sprint. Se usa para planificar sprints futuros con datos reales en vez de suposiciones.
 
@@ -3795,7 +5659,7 @@ Velocidad media: ~19-20 puntos por sprint
 
 ---
 
-## 14.7 Tablero Kanban (herramienta de seguimiento visual)
+## 17.7 Tablero Kanban (herramienta de seguimiento visual)
 
 Muchos equipos Scrum usan un tablero Kanban (en Jira, Azure DevOps o Trello) para visualizar el flujo del sprint:
 
@@ -3813,7 +5677,7 @@ El equipo mueve las tarjetas de izquierda a derecha durante el sprint. Un vistaz
 
 ---
 
-## 14.8 Qué esperar en Espiral MS
+## 17.8 Qué esperar en Espiral MS
 
 Con alta probabilidad, en las prácticas:
 - Sprints de 2 semanas, con Jira o Azure DevOps para el backlog
@@ -3825,7 +5689,7 @@ Con alta probabilidad, en las prácticas:
 
 ---
 
-## 14.9 Ejercicio práctico
+## 17.9 Ejercicio práctico
 
 Simula un mini-sprint sobre tu proyecto de biblioteca:
 
@@ -3837,11 +5701,11 @@ Simula un mini-sprint sobre tu proyecto de biblioteca:
 
 ---
 
-# Lección 15: Frontend
+# Lección 18: Frontend
 
 [[#Índice|↑ Volver al índice]]
 
-## 15.1 HTML5 Semántico
+## 18.1 HTML5 Semántico
 
 Tener nociones básicas de HTML no es lo mismo que escribirlo con **semántica** — usar la etiqueta que realmente describe el contenido, no solo `<div>` para todo.
 
@@ -3902,7 +5766,7 @@ Tener nociones básicas de HTML no es lo mismo que escribirlo con **semántica**
 
 ---
 
-## 15.2 Formularios HTML5
+## 18.2 Formularios HTML5
 
 ```html
 <form>
@@ -3927,7 +5791,7 @@ Los tipos `email`, `number`, `date` activan validación nativa del navegador sin
 
 ---
 
-## 15.3 CSS3 — Flexbox y Grid
+## 18.3 CSS3 — Flexbox y Grid
 
 ### Flexbox (alineación en una dimensión)
 
@@ -3990,7 +5854,7 @@ Los tipos `email`, `number`, `date` activan validación nativa del navegador sin
 
 ---
 
-## 15.4 JavaScript Moderno (ES6+)
+## 18.4 JavaScript Moderno (ES6+)
 
 ### Arrow functions
 
@@ -4102,7 +5966,7 @@ const todosPositivos = numeros.every(n => n > 0);           // como .All()
 
 ---
 
-## 15.5 Ejercicio práctico
+## 18.5 Ejercicio práctico
 
 1. Crea una página HTML con estructura semántica completa (header, nav, main, article, aside, footer)
 2. Usa Flexbox para una barra de navegación y Grid para una galería de tarjetas
@@ -4113,11 +5977,11 @@ const todosPositivos = numeros.every(n => n > 0);           // como .All()
 
 ---
 
-# Lección 16: TypeScript
+# Lección 19: TypeScript
 
 [[#Índice|↑ Volver al índice]]
 
-## 16.1 ¿Qué es TypeScript y por qué usarlo?
+## 19.1 ¿Qué es TypeScript y por qué usarlo?
 
 TypeScript es JavaScript con **tipos estáticos**, desarrollado por Microsoft. Compila a JavaScript normal — el navegador nunca ejecuta TypeScript directamente.
 
@@ -4139,7 +6003,7 @@ sumar("5", 3); // Error de compilación: string no asignable a number
 
 ---
 
-## 16.2 Tipos básicos
+## 19.2 Tipos básicos
 
 ```typescript
 const nombre: string = "Ana";
@@ -4176,7 +6040,7 @@ const nombres: Array<string> = ["Ana", "Luis"];
 
 ---
 
-## 16.3 Interfaces (paralelo directo con C#)
+## 19.3 Interfaces (paralelo directo con C#)
 
 ```typescript
 interface IRepositorio<T> {
@@ -4212,7 +6076,7 @@ Esta estructura es literalmente el mismo patrón Repository que viste en C# (Lec
 
 ---
 
-## 16.4 Generics en TypeScript
+## 19.4 Generics en TypeScript
 
 ```typescript
 // Función genérica
@@ -4238,7 +6102,7 @@ const contenedor = new Contenedor<string>("Hola");
 
 ---
 
-## 16.5 Enums
+## 19.5 Enums
 
 ```typescript
 enum EstadoPedido {
@@ -4260,7 +6124,7 @@ enum Rol {
 
 ---
 
-## 16.6 Configuración básica de un proyecto TypeScript
+## 19.6 Configuración básica de un proyecto TypeScript
 
 ```bash
 npm init -y
@@ -4288,9 +6152,9 @@ npx tsc --watch          # recompila automáticamente al guardar
 
 ---
 
-## 16.7 Ejercicio práctico
+## 19.7 Ejercicio práctico
 
-1. Reescribe tu código JavaScript de la Lección 15 en TypeScript, añadiendo tipos explícitos
+1. Reescribe tu código JavaScript de la Lección 18 en TypeScript, añadiendo tipos explícitos
 2. Define una interfaz `Usuario` con `id`, `nombre`, `email` (opcional)
 3. Crea una interfaz genérica `IRepositorio<T>` y una clase `RepositorioUsuarios` que la implemente
 4. Añade un `enum EstadoUsuario` con valores `Activo`, `Inactivo`, `Pendiente`
@@ -4317,6 +6181,9 @@ npx tsc --watch          # recompila automáticamente al guardar
 - **SQL**: Oracle y T-SQL, joins, agregaciones, subconsultas, índices y planes de ejecución
 - **Entity Framework Core**: LINQ → SQL automático, change tracking, `AsNoTracking()`, el problema N+1, transacciones explícitas y concurrencia optimista
 - **ASP.NET Core Web API**: controladores, minimal APIs, DTOs, validación, códigos HTTP, middleware, `ProblemDetails` y Swagger
+- **Arquitectura de backend**: capas y regla de dependencia, Clean/Onion/Hexagonal, proyectos por capa, DI a fondo y *captive dependency*, tests de arquitectura, Vertical Slice
+- **Dominio, errores y validación**: Unit of Work, modelo rico vs anémico, value objects con `record`, Result pattern, FluentValidation y mapeo entre capas
+- **API lista para producción**: versionado, health checks, `IExceptionHandler`, resiliencia con Polly, `BackgroundService` y checklist de despliegue
 
 **Calidad y entorno profesional**
 - **Testing**: xUnit (`[Fact]`, `[Theory]`, fixtures), Moq, y el criterio de qué merece la pena testear
@@ -4349,9 +6216,10 @@ Si tuvieras que llevarte una sola página de toda la guía, que sea esta.
 ## Cómo seguir a partir de aquí
 
 1. **Antes de empezar las prácticas:** haz los ejercicios de las lecciones 1 a 6 y monta el mini-proyecto. Es el cimiento; sin eso, el resto se queda en teoría.
-2. **La primera semana:** lecciones 8, 10 y 12 (Entity Framework, Web API, configuración). Es exactamente lo que tocarás el primer día en un proyecto real.
-3. **Cuando te asignen tu primera tarea:** vuelve a la Lección 11 (testing) y a la 13 (Git). Tu primer pull request se juzgará por esas dos cosas tanto como por el código.
-4. **En paralelo:** `MIGRACION_JAVA_A_CSHARP.md` recorre el proyecto real MarinaApi aplicando todo esto, con la comparación explícita frente a Spring Boot e Hibernate.
+2. **La primera semana:** lecciones 8, 10 y 15 (Entity Framework, Web API, configuración). Es exactamente lo que tocarás el primer día en un proyecto real.
+3. **Cuando te asignen tu primera tarea:** vuelve a la Lección 14 (testing) y a la 16 (Git). Tu primer pull request se juzgará por esas dos cosas tanto como por el código.
+4. **Cuando entiendas la estructura del proyecto:** lecciones 11 y 12 (arquitectura y dominio), para saber *por qué* está organizado así. Y antes del primer despliegue, la checklist de la Lección 13.6.
+5. **En paralelo:** `MIGRACION_JAVA_A_CSHARP.md` recorre el proyecto real MarinaApi aplicando todo esto, con la comparación explícita frente a Spring Boot e Hibernate.
 
 Y una última cosa que no cabe en ninguna lección: **en unas prácticas no se espera que lo sepas todo, se espera que preguntes bien, escuches las revisiones y no repitas dos veces el mismo error.** Eso pesa más que cualquier lista de tecnologías.
 
