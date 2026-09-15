@@ -127,6 +127,31 @@ var dtos = barcos.Select(b => b.ToDto()).ToList();  // se encadena con LINQ sin 
 
 ---
 
+### Sobrecarga por tipo de retorno (no existe)
+
+**Qué es:** en C#, el compilador **no** distingue dos miembros por su tipo de retorno — solo por nombre + lista de parámetros (tipo, orden, cantidad). Dos métodos con la misma firma de parámetros pero distinto `return type` no son una sobrecarga válida; es un error de compilación (`CS0111`) si están en el mismo tipo.
+
+**Equivalente en Java:** misma regla exactamente — Java tampoco permite overloading solo por tipo de retorno, por el mismo motivo: la resolución de sobrecarga ocurre en tiempo de compilación mirando la firma de la llamada (argumentos), no lo que se hace con el valor devuelto. No es una diferencia C#/Java, es una regla compartida por la mayoría de lenguajes con overloading estático.
+
+**Dónde apareció (ticket #151):** al implementar `AssignBarcoAsync`, `IAmarreRepository` y `ITripulanteRepository` ya tenían cada uno su propio `FindByBarcoIdAsync(long barcoId, CancellationToken ct = default)` — misma firma de parámetros, pero uno devuelve `Amarre?` (un Amarre busca "su" Barco) y el otro `List<Tripulante>` (un Barco tiene varios Tripulantes). Al vivir en interfaces distintas no hay conflicto real, pero el nombre idéntico + firma idéntica es la clase de situación donde, si por error se intenta declarar ambas sobrecargas dentro de la **misma** interfaz o clase, el compilador lo rechaza de inmediato — no hay forma de que resuelva cuál llamar mirando solo el tipo de retorno esperado.
+
+**Ejemplo (real del proyecto):**
+```csharp
+// IAmarreRepository.cs
+Task<Amarre?> FindByBarcoIdAsync(long barcoId, CancellationToken ct = default);
+
+// ITripulanteRepository.cs
+Task<List<Tripulante>> FindByBarcoIdAsync(long barcoId, CancellationToken ct = default);
+
+// Esto compila porque son interfaces distintas.
+// Si ambas firmas convivieran en la MISMA interfaz, sería CS0111:
+// "Type 'X' already defines a member called 'FindByBarcoIdAsync' with the same parameter types"
+```
+
+**Cómo se resuelve de verdad** cuando hace falta variar solo el retorno para el mismo concepto: cambiar el nombre (`FindAmarreByBarcoIdAsync` / `FindTripulantesByBarcoIdAsync`), o mover la variación al tipo genérico si el repositorio es genérico. Ver `MIGRACION_JAVA_A_CSHARP.md` → sección de excepciones/middleware → "Ampliación: el mismo patrón para conflictos de negocio (ticket #151)" para el contexto completo del ticket.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
