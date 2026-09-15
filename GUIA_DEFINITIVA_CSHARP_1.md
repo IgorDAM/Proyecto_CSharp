@@ -13,7 +13,7 @@
 6. [[#Lección 4: Generics]]
 7. [[#Lección 5: Delegates y Eventos]]
 8. [[#Lección 6: Patrones de Diseño]]
-9. [[#Lección 7: SQL — Oracle y T-SQL|Lección 7: SQL]]
+9. [[#Lección 7: SQL — MySQL, PostgreSQL y SQL Server|Lección 7: SQL]]
 10. [[#Lección 8: Entity Framework Core|Lección 8: Entity Framework]]
 11. [[#Lección 9: Records y Pattern Matching|Lección 9: Records y Pattern Matching]]
 12. [[#Lección 10: ASP.NET Core Web API|Lección 10: ASP.NET Core Web API]]
@@ -1700,11 +1700,76 @@ En cualquier proyecto .NET profesional verás esta combinación constantemente: 
 
 ---
 
-# Lección 7: SQL — Oracle y T-SQL
+# Lección 7: SQL — MySQL, PostgreSQL y SQL Server
 
 [[#Índice|↑ Volver al índice]]
 
+El SQL estándar (`SELECT`, `JOIN`, `GROUP BY`, índices) es el mismo en todos los motores. Lo que cambia son los tipos de datos, algunas funciones y un puñado de comportamientos que dan sustos. Esta lección trabaja con los cuatro motores que te puedes encontrar:
+
+| Motor | Por qué está en esta guía |
+|---|---|
+| **MySQL** y **PostgreSQL** | Son los motores con los que trabaja SEIDEL |
+| **SQL Server (T-SQL)** | Es el motor de MarinaApi y el más habitual en el ecosistema .NET |
+| **Oracle** | Aparece a menudo en sistemas corporativos heredados; conviene reconocer su sintaxis |
+
+Salvo que se indique lo contrario, las consultas de 7.2 a 7.7 funcionan igual en los cuatro. Cuando no es así, hay un aviso con la variante de cada motor, y la tabla de 7.10 lo resume todo.
+
+> 🧠 **Mentalidad Java → C#:** el SQL que escribes no depende del lenguaje: una consulta que funcionaba desde Spring funciona igual desde .NET. Lo que cambia es **el driver**. En Java añadías `org.postgresql:postgresql` o `com.mysql:mysql-connector-j` y usabas JDBC; en .NET añades el paquete NuGet **Npgsql** o **MySqlConnector** y usas ADO.NET (sección 7.9). Y donde en Spring configurabas `spring.jpa.database-platform`, en EF Core eliges el proveedor con `UseNpgsql` o `UseMySql` (Lección 11.4).
+
+> 💡 **Tip — practica con los motores reales:** con Docker tienes los tres motores libres en un minuto, sin instalar nada:
+> ```bash
+> docker run --name pg    -e POSTGRES_PASSWORD=dev      -p 5432:5432 -d postgres:17
+> docker run --name mysql -e MYSQL_ROOT_PASSWORD=dev    -p 3306:3306 -d mysql:8.4
+> docker run --name mssql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD='Dev_12345' -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
+> ```
+> Como cliente gráfico para los tres, **DBeaver** (gratuito). Los específicos: pgAdmin (PostgreSQL), MySQL Workbench (MySQL) y SSMS (SQL Server).
+
+---
+
 ## 7.1 DDL — Crear la estructura de la base de datos
+
+### PostgreSQL
+
+```sql
+CREATE TABLE Clientes (
+    IdCliente     INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,  -- auto-incremento estándar SQL (PostgreSQL 10+)
+    NombreCliente VARCHAR(100) NOT NULL,
+    Email         VARCHAR(100),
+    Pais          VARCHAR(50)  NOT NULL,
+    Activo        BOOLEAN      NOT NULL DEFAULT TRUE,             -- booleano real
+    FechaRegistro TIMESTAMPTZ  NOT NULL DEFAULT now()             -- fecha y hora con zona horaria
+);
+
+CREATE TABLE Pedidos (
+    IdPedido    INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    IdCliente   INT            NOT NULL REFERENCES Clientes(IdCliente),
+    FechaPedido TIMESTAMPTZ    NOT NULL DEFAULT now(),
+    Total       NUMERIC(10, 2) NOT NULL DEFAULT 0
+);
+```
+
+### MySQL
+
+```sql
+CREATE TABLE Clientes (
+    IdCliente     INT AUTO_INCREMENT PRIMARY KEY,                 -- AUTO_INCREMENT = auto-incremento (MySQL)
+    NombreCliente VARCHAR(100) NOT NULL,
+    Email         VARCHAR(100),
+    Pais          VARCHAR(50)  NOT NULL,
+    Activo        BOOLEAN      NOT NULL DEFAULT TRUE,             -- en realidad es un alias de TINYINT(1)
+    FechaRegistro DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE Pedidos (
+    IdPedido    INT AUTO_INCREMENT PRIMARY KEY,
+    IdCliente   INT            NOT NULL,
+    FechaPedido DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    Total       DECIMAL(10, 2) NOT NULL DEFAULT 0,
+    FOREIGN KEY (IdCliente) REFERENCES Clientes(IdCliente)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### SQL Server (T-SQL)
 
 ```sql
 CREATE TABLE Clientes (
@@ -1723,16 +1788,29 @@ CREATE TABLE Pedidos (
     Total DECIMAL(10, 2) NOT NULL DEFAULT 0,
     FOREIGN KEY (IdCliente) REFERENCES Clientes(IdCliente)
 );
+```
 
--- Modificar una tabla existente
-ALTER TABLE Clientes ADD Telefono NVARCHAR(20);
+### Comunes a los tres
+
+```sql
+-- Modificar una tabla existente (la palabra COLUMN es opcional en MySQL y PostgreSQL, y no se admite en SQL Server)
+ALTER TABLE Clientes ADD Telefono VARCHAR(20);      -- en SQL Server, lo idiomático es NVARCHAR(20)
 ALTER TABLE Clientes DROP COLUMN Telefono;
 
 -- Eliminar una tabla
 DROP TABLE Pedidos;
 ```
 
-En Oracle, el equivalente de `IDENTITY` es una `SEQUENCE` combinada con un `TRIGGER`, o directamente `GENERATED ALWAYS AS IDENTITY` en versiones modernas (Oracle 12c+).
+En Oracle, el equivalente de `IDENTITY` es una `SEQUENCE` combinada con un `TRIGGER`, o directamente `GENERATED ALWAYS AS IDENTITY` en versiones modernas (Oracle 12c+), la misma sintaxis que PostgreSQL.
+
+> ⚠️ **Cuidado — MySQL y `utf8`:** en MySQL, el juego de caracteres llamado `utf8` **no es UTF-8 completo**: es un alias de `utf8mb3`, que solo admite hasta 3 bytes por carácter. Un emoji o ciertos caracteres asiáticos en un nombre hacen fallar el `INSERT` (o se guardan como `?`). Usa siempre **`utf8mb4`**, que es el valor por defecto desde MySQL 8.0, pero no en bases de datos creadas con versiones anteriores. Es muy habitual encontrarlo mal en sistemas heredados.
+
+> ⚠️ **Cuidado — mayúsculas en los nombres de tablas y columnas:**
+> - **PostgreSQL** convierte a minúsculas todo identificador sin comillas: `CREATE TABLE Clientes` crea la tabla `clientes`, y `SELECT * FROM CLIENTES` también funciona. Pero si la tabla se creó **con comillas** (`"Clientes"`), hay que usarlas siempre. **EF Core con Npgsql crea las tablas con comillas y en PascalCase**, así que en SQL escrito a mano tendrás que escribir `SELECT * FROM "Clientes"`. Por eso muchos equipos usan el paquete `EFCore.NamingConventions` con `.UseSnakeCaseNamingConvention()`, que genera `clientes` e `id_cliente`.
+> - **MySQL en Linux** distingue mayúsculas en los **nombres de tabla** (son archivos del sistema operativo); en Windows, no. Una consulta con `clientes` que funcionaba en tu portátil falla en el servidor Linux de producción, en Azure o AWS, donde la tabla se llama `Clientes`.
+> - **SQL Server** no distingue mayúsculas en identificadores con la configuración habitual.
+
+> 💡 **Tip — DDL y transacciones:** en **PostgreSQL** (y en SQL Server) un `CREATE TABLE` o un `ALTER TABLE` puede ir dentro de una transacción y deshacerse con `ROLLBACK`. En **MySQL** (y en Oracle), cada sentencia DDL **confirma implícitamente** la transacción en curso. Consecuencia práctica: si una migración de EF Core con varios cambios de esquema falla a mitad en MySQL, la base de datos queda a medio migrar y hay que arreglarla a mano. En PostgreSQL la migración entera se deshace.
 
 ---
 
@@ -1752,24 +1830,73 @@ WHERE IdCliente = 5;
 DELETE FROM Clientes WHERE Activo = 0 AND FechaRegistro < '2020-01-01';
 ```
 
+> ⚠️ **Cuidado — booleanos en PostgreSQL:** los ejemplos de esta lección usan `1` y `0` para `Activo`, que es lo que admiten SQL Server (`BIT`) y MySQL (`TINYINT(1)`). **PostgreSQL no convierte automáticamente un entero a `BOOLEAN`**: `INSERT ... VALUES (..., 1)` falla con *column "activo" is of type boolean but expression is of type integer*. En PostgreSQL escribe `TRUE` / `FALSE` (`SET Activo = FALSE`, `WHERE Activo`). MySQL también acepta `TRUE`/`FALSE`; SQL Server no.
+
 > ⚠️ **Cuidado — la regla que te salvará el puesto:** antes de ejecutar un `UPDATE` o un `DELETE`, escribe primero la consulta como `SELECT * FROM ... WHERE ...` con **exactamente el mismo WHERE**, míralo, y solo entonces cambia el `SELECT *` por el `UPDATE`/`DELETE`. Un `WHERE` mal escrito (o directamente olvidado) afecta a la tabla entera. Si estás en una base de datos compartida, envuélvelo además en una transacción explícita para poder hacer `ROLLBACK`:
 > ```sql
-> BEGIN TRANSACTION;
+> BEGIN TRANSACTION;          -- SQL Server y PostgreSQL. En MySQL: START TRANSACTION;
 >   UPDATE Clientes SET Activo = 0 WHERE IdCliente = 5;
 >   -- comprueba el número de filas afectadas antes de decidir
 > ROLLBACK;  -- o COMMIT; si es correcto
 > ```
 
+> 💡 **Tip:** MySQL Workbench trae activado el *safe update mode*: rechaza (Error 1175) un `UPDATE` o `DELETE` cuyo `WHERE` no use una clave. Molesta la primera vez, pero es exactamente la red de seguridad del aviso anterior. No lo desactives en una base de datos compartida.
+
 > 💡 **Tip:** `NULL` no es igual a nada, ni siquiera a sí mismo. `WHERE Email = NULL` **nunca** devuelve filas, aunque haya emails nulos. Hay que escribir `WHERE Email IS NULL`. Y ojo con `NOT IN (subconsulta)`: si la subconsulta devuelve un solo `NULL`, el resultado completo es vacío. Por eso en código profesional se prefiere `NOT EXISTS`, que no tiene ese problema.
+
+### Recuperar el Id recién insertado
+
+Muy habitual desde una API: insertas y necesitas devolver el Id generado (el `201 Created` con `Location` de la Lección 10.3).
+
+```sql
+-- PostgreSQL (y Oracle con RETURNING ... INTO): en la misma sentencia
+INSERT INTO Clientes (NombreCliente, Email, Pais)
+VALUES ('Ana García', 'ana@example.com', 'España')
+RETURNING IdCliente;
+
+-- MySQL: en la misma conexión, justo después del INSERT
+INSERT INTO Clientes (NombreCliente, Email, Pais) VALUES ('Ana García', 'ana@example.com', 'España');
+SELECT LAST_INSERT_ID();
+
+-- SQL Server
+INSERT INTO Clientes (NombreCliente, Email, Pais, Activo)
+OUTPUT INSERTED.IdCliente
+VALUES ('Ana García', 'ana@example.com', 'España', 1);
+```
+
+### Upsert: insertar o actualizar si ya existe
+
+Requiere un índice único sobre la columna que identifica el duplicado (aquí, `Email`; ver 7.7).
+
+```sql
+-- PostgreSQL
+INSERT INTO Clientes (NombreCliente, Email, Pais)
+VALUES ('Ana García', 'ana@example.com', 'España')
+ON CONFLICT (Email) DO UPDATE SET NombreCliente = EXCLUDED.NombreCliente;
+
+-- MySQL
+INSERT INTO Clientes (NombreCliente, Email, Pais)
+VALUES ('Ana García', 'ana@example.com', 'España')
+ON DUPLICATE KEY UPDATE NombreCliente = VALUES(NombreCliente);   -- MySQL 8.0.20+ prefiere un alias: AS nuevo ... = nuevo.NombreCliente
+
+-- SQL Server: MERGE (Oracle también tiene MERGE, con una sintaxis ligeramente distinta)
+MERGE INTO Clientes AS destino
+USING (SELECT 'ana@example.com' AS Email, 'Ana García' AS NombreCliente, 'España' AS Pais) AS origen
+ON destino.Email = origen.Email
+WHEN MATCHED THEN UPDATE SET NombreCliente = origen.NombreCliente
+WHEN NOT MATCHED THEN INSERT (NombreCliente, Email, Pais, Activo) VALUES (origen.NombreCliente, origen.Email, origen.Pais, 1);
+```
+
+> 💡 **Tip:** el upsert resuelve de verdad la condición de carrera de "compruebo si existe y luego inserto" (Lección 12.4): la base de datos hace las dos cosas de forma atómica. EF Core no tiene upsert nativo; si lo necesitas, se escribe con SQL (sección 7.9) o con una librería como `FlexLabs.EntityFrameworkCore.Upsert`.
 
 ---
 
 ## 7.3 Consultas básicas
 
 ```sql
-SELECT * FROM Clientes WHERE Activo = 1 ORDER BY Nombre;
+SELECT * FROM Clientes WHERE Activo = 1 ORDER BY NombreCliente;
 
-SELECT Nombre, Email FROM Clientes WHERE Pais = 'España';
+SELECT NombreCliente, Email FROM Clientes WHERE Pais = 'España';
 
 SELECT COUNT(*) AS Total FROM Clientes;
 
@@ -1787,6 +1914,27 @@ SELECT * FROM Clientes WHERE Pais IN ('España', 'México', 'Argentina');
 -- BETWEEN para rangos
 SELECT * FROM Pedidos WHERE Total BETWEEN 50 AND 200;
 ```
+
+(En PostgreSQL, recuerda `WHERE Activo` o `WHERE Activo = TRUE` en lugar de `= 1`.)
+
+> ⚠️ **Cuidado — mayúsculas en las búsquedas de texto:** `WHERE NombreCliente LIKE 'ana%'` encuentra a "Ana García" en **MySQL** (sus *collations* por defecto, terminadas en `_ci`, no distinguen mayúsculas) y en **SQL Server** (collation por defecto también insensible). En **PostgreSQL** (y en Oracle) **no la encuentra**: la comparación distingue mayúsculas. En PostgreSQL se usa `ILIKE` o `lower(NombreCliente) LIKE 'ana%'`. Es la misma trampa que se describe para EF Core en la Lección 11.4: una consulta que "funcionaba" deja de devolver resultados al cambiar de motor.
+
+### Paginación: limitar y saltar filas
+
+Es el SQL que genera EF Core cuando escribes `Skip(20).Take(10)` (Lección 2.4):
+
+```sql
+-- MySQL y PostgreSQL
+SELECT IdCliente, NombreCliente FROM Clientes ORDER BY IdCliente LIMIT 10 OFFSET 20;
+
+-- Estándar SQL: PostgreSQL, SQL Server 2012+ y Oracle 12c+
+SELECT IdCliente, NombreCliente FROM Clientes ORDER BY IdCliente OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY;
+
+-- SQL Server, solo las primeras filas
+SELECT TOP 10 IdCliente, NombreCliente FROM Clientes ORDER BY IdCliente;
+```
+
+> ⚠️ **Cuidado:** paginar **sin `ORDER BY`** devuelve páginas en un orden que el motor no garantiza. Puede funcionar mil veces y un día repetir o saltarse filas entre la página 2 y la 3. Ordena siempre por una columna única (o que acabe en una única, como `ORDER BY FechaPedido, IdPedido`).
 
 ---
 
@@ -1816,6 +1964,14 @@ FROM Clientes c
 FULL OUTER JOIN Pedidos p ON c.IdCliente = p.IdCliente;
 ```
 
+> ⚠️ **Cuidado — MySQL no tiene `FULL OUTER JOIN`.** Da error de sintaxis. Se emula uniendo un `LEFT JOIN` y un `RIGHT JOIN`:
+> ```sql
+> SELECT c.NombreCliente, p.Total FROM Clientes c LEFT JOIN  Pedidos p ON c.IdCliente = p.IdCliente
+> UNION
+> SELECT c.NombreCliente, p.Total FROM Clientes c RIGHT JOIN Pedidos p ON c.IdCliente = p.IdCliente;
+> ```
+> PostgreSQL, SQL Server y Oracle sí lo admiten.
+
 ### Join múltiple (3+ tablas), el más común en consultas reales
 
 ```sql
@@ -1840,16 +1996,21 @@ ORDER BY Total DESC;
 
 -- Varias agregaciones a la vez
 SELECT
-    Pais,
-    COUNT(*) AS TotalClientes,
-    AVG(TotalGastado) AS GastoPromedio,
-    MAX(TotalGastado) AS GastoMaximo,
-    MIN(FechaRegistro) AS PrimerRegistro
-FROM Clientes
-GROUP BY Pais;
+    c.Pais,
+    COUNT(DISTINCT c.IdCliente) AS TotalClientes,
+    AVG(p.Total)                AS TicketMedio,
+    MAX(p.Total)                AS PedidoMaximo,
+    MIN(c.FechaRegistro)        AS PrimerRegistro
+FROM Clientes c
+INNER JOIN Pedidos p ON p.IdCliente = c.IdCliente
+GROUP BY c.Pais;
 ```
 
 **Diferencia clave WHERE vs HAVING:** `WHERE` filtra filas individuales antes de agrupar; `HAVING` filtra grupos ya formados. Por eso `HAVING COUNT(*) > 5` funciona pero `WHERE COUNT(*) > 5` da error.
+
+> ⚠️ **Cuidado — columnas fuera del `GROUP BY`:** `SELECT Pais, NombreCliente, COUNT(*) FROM Clientes GROUP BY Pais` no tiene sentido (¿qué `NombreCliente` de todo el grupo se muestra?). PostgreSQL, SQL Server y Oracle lo rechazan. Las versiones antiguas de MySQL (o una con `ONLY_FULL_GROUP_BY` desactivado) **lo aceptan y devuelven un valor cualquiera del grupo**, sin avisar. Si mantienes consultas de un MySQL heredado, este es uno de los errores silenciosos más frecuentes.
+
+> 💡 **Tip — concatenar los valores de un grupo** (por ejemplo, la lista de países de cada cliente en una sola celda): `STRING_AGG(Pais, ', ')` en PostgreSQL y SQL Server 2017+, `GROUP_CONCAT(Pais SEPARATOR ', ')` en MySQL, y `LISTAGG(Pais, ', ')` en Oracle.
 
 ---
 
@@ -1875,6 +2036,31 @@ WITH ClientesActivos AS (
 SELECT NombreCliente, Pais FROM ClientesActivos WHERE Pais = 'España';
 ```
 
+### Funciones de ventana
+
+Calculan algo "sobre un grupo de filas" **sin colapsarlas** como hace `GROUP BY`. Resuelven de forma limpia preguntas típicas: el último pedido de cada cliente, un ranking, un total acumulado.
+
+```sql
+-- Numerar los pedidos de cada cliente del más reciente al más antiguo, y quedarse con el último
+WITH PedidosNumerados AS (
+    SELECT
+        p.*,
+        ROW_NUMBER() OVER (PARTITION BY p.IdCliente ORDER BY p.FechaPedido DESC) AS Orden
+    FROM Pedidos p
+)
+SELECT IdCliente, IdPedido, FechaPedido, Total
+FROM PedidosNumerados
+WHERE Orden = 1;
+
+-- Total acumulado de cada cliente, pedido a pedido
+SELECT
+    IdCliente, FechaPedido, Total,
+    SUM(Total) OVER (PARTITION BY IdCliente ORDER BY FechaPedido) AS Acumulado
+FROM Pedidos;
+```
+
+> ⚠️ **Cuidado — MySQL 5.7:** las CTE (`WITH`) y las funciones de ventana (`OVER`) existen en **MySQL 8.0 o superior**. En un MySQL 5.7, todavía frecuente en sistemas heredados, las dos dan error de sintaxis y hay que reescribirlas con subconsultas y *joins*. Antes de escribir SQL para un sistema existente, ejecuta `SELECT VERSION();`. PostgreSQL, SQL Server y Oracle las soportan desde hace muchos años.
+
 ---
 
 ## 7.7 Índices — por qué importan para el rendimiento
@@ -1890,19 +2076,84 @@ CREATE UNIQUE INDEX UX_Clientes_Email ON Clientes(Email);
 CREATE INDEX IX_Pedidos_Cliente_Fecha ON Pedidos(IdCliente, FechaPedido);
 ```
 
+La sintaxis es la misma en MySQL, PostgreSQL, SQL Server y Oracle.
+
 Sin índice, `WHERE Email = '...'` recorre toda la tabla fila por fila (*table scan*). Con índice, la búsqueda es casi instantánea incluso con millones de filas. La contrapartida: cada índice ralentiza ligeramente los `INSERT`/`UPDATE`, así que no se indexa todo indiscriminadamente.
 
 > ⚠️ **Cuidado — cómo anular un índice sin querer:** si aplicas una función a la columna indexada en el `WHERE`, el índice **deja de usarse**. `WHERE YEAR(FechaPedido) = 2026` hace table scan; `WHERE FechaPedido >= '2026-01-01' AND FechaPedido < '2027-01-01'` usa el índice. Lo mismo con `WHERE UPPER(Email) = '...'` o `WHERE Email LIKE '%algo'` (el comodín al principio impide usar el índice; al final, `'algo%'`, sí lo usa).
 
+> 💡 **Tip — índices sobre expresiones:** si de verdad necesitas buscar por `lower(Email)` (el caso típico en PostgreSQL, que distingue mayúsculas), indexa la expresión en vez de la columna: `CREATE INDEX IX_Clientes_EmailMinusculas ON Clientes (lower(Email));`. Así `WHERE lower(Email) = 'ana@example.com'` vuelve a usar índice. MySQL 8.0.13+ lo admite con doble paréntesis (`((lower(Email)))`), y SQL Server mediante una columna calculada indexada.
+
 > 💡 **Tip:** en un índice compuesto **el orden de las columnas importa**. `INDEX (IdCliente, FechaPedido)` sirve para filtrar por `IdCliente` solo, o por `IdCliente + FechaPedido`, pero **no** para filtrar solo por `FechaPedido`. Piénsalo como una guía telefónica ordenada por apellido y luego nombre: buscar "García" es inmediato, buscar a todos los "Ana" no.
 
-> 💡 **Tip:** en SQL Server, activa `Include Actual Execution Plan` (Ctrl+M en SSMS) antes de ejecutar una consulta lenta. Si ves "Table Scan" o "Clustered Index Scan" sobre una tabla grande, ahí está tu problema. Saber leer un plan de ejecución, aunque sea por encima, te distingue inmediatamente de un becario medio.
+> 💡 **Tip — leer el plan de ejecución:** es lo primero que se mira ante una consulta lenta. Saber leer un plan de ejecución, aunque sea por encima, te distingue inmediatamente de un becario medio.
+> - **PostgreSQL:** `EXPLAIN ANALYZE SELECT ...` ejecuta la consulta y muestra el plan real. Busca `Seq Scan` sobre una tabla grande (recorrido completo) donde esperabas `Index Scan`.
+> - **MySQL 8.0.18+:** `EXPLAIN ANALYZE SELECT ...`. En el `EXPLAIN` clásico, `type: ALL` significa recorrido completo de la tabla.
+> - **SQL Server:** activa `Include Actual Execution Plan` (Ctrl+M en SSMS) antes de ejecutar. Si ves "Table Scan" o "Clustered Index Scan" sobre una tabla grande, ahí está tu problema.
+
+> ⚠️ **Cuidado:** en PostgreSQL, `EXPLAIN ANALYZE` **ejecuta de verdad** la sentencia: sobre un `UPDATE` o un `DELETE`, modifica los datos. Para analizar una sentencia que modifica, envuélvela en `BEGIN; EXPLAIN ANALYZE ...; ROLLBACK;` o usa solo `EXPLAIN`, que no la ejecuta.
 
 > 💡 **Tip:** `SELECT *` está bien para explorar a mano, pero en código de producción es un problema: trae columnas que no necesitas (más red, más memoria), y se rompe silenciosamente si alguien reordena o añade columnas. Nombra siempre las columnas que usas.
 
 ---
 
 ## 7.8 Procedimientos almacenados
+
+### PostgreSQL
+
+En PostgreSQL lo habitual para **devolver datos** es una **función**; los **procedimientos** (PostgreSQL 11+) se usan para operaciones que modifican datos y pueden gestionar transacciones.
+
+```sql
+-- Función que devuelve filas
+CREATE OR REPLACE FUNCTION fn_obtener_clientes(p_pais VARCHAR)
+RETURNS TABLE (IdCliente INT, NombreCliente VARCHAR, Email VARCHAR)
+LANGUAGE sql
+AS $$
+    SELECT c.IdCliente, c.NombreCliente, c.Email
+    FROM Clientes c
+    WHERE c.Pais = p_pais AND c.Activo = TRUE;
+$$;
+
+SELECT * FROM fn_obtener_clientes('España');
+
+-- Procedimiento que modifica datos
+CREATE OR REPLACE PROCEDURE sp_desactivar_cliente(p_id INT)
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    UPDATE Clientes SET Activo = FALSE WHERE IdCliente = p_id;
+END;
+$$;
+
+CALL sp_desactivar_cliente(5);
+```
+
+### MySQL
+
+```sql
+DELIMITER //
+
+CREATE PROCEDURE sp_insertar_cliente(
+    IN  p_nombre   VARCHAR(100),
+    IN  p_email    VARCHAR(100),
+    IN  p_pais     VARCHAR(50),
+    OUT p_id_nuevo INT
+)
+BEGIN
+    INSERT INTO Clientes (NombreCliente, Email, Pais, Activo)
+    VALUES (p_nombre, p_email, p_pais, TRUE);
+
+    SET p_id_nuevo = LAST_INSERT_ID();
+END //
+
+DELIMITER ;
+
+-- Ejecutar el procedimiento
+CALL sp_insertar_cliente('Ana García', 'ana@example.com', 'España', @nuevo_id);
+SELECT @nuevo_id;
+```
+
+> ⚠️ **Cuidado:** `DELIMITER` **no es SQL**: es una orden del cliente de consola `mysql` y de MySQL Workbench para que el `;` interno no corte el procedimiento. Si pegas ese script tal cual en una migración de EF Core o lo envías desde C#, falla con error de sintaxis. Desde código se envía solo el `CREATE PROCEDURE ... END`, sin las líneas `DELIMITER`.
 
 ### Oracle
 
@@ -1914,7 +2165,7 @@ CREATE PROCEDURE sp_ObtenerClientes(
 IS
 BEGIN
     OPEN p_Resultado FOR
-        SELECT IdCliente, Nombre, Email
+        SELECT IdCliente, NombreCliente, Email
         FROM Clientes
         WHERE Pais = p_Pais AND Activo = 1;
 END;
@@ -1933,7 +2184,7 @@ BEGIN
     INSERT INTO Clientes (NombreCliente, Email, Pais, Activo)
     VALUES (@Nombre, @Email, @Pais, 1);
 
-    SET @IdNuevo = @@IDENTITY;
+    SET @IdNuevo = SCOPE_IDENTITY();
 END;
 
 -- Ejecutar el procedimiento
@@ -1942,24 +2193,150 @@ EXEC sp_InsertarCliente 'Ana García', 'ana@example.com', 'España', @NuevoId OU
 SELECT @NuevoId;
 ```
 
+> ⚠️ **Cuidado:** en código T-SQL antiguo verás `@@IDENTITY` para obtener el Id insertado. Devuelve el **último Id generado en la sesión en cualquier tabla**, así que si la tabla tiene un *trigger* que inserta en una tabla de auditoría, obtienes el Id de la auditoría, no el del cliente. `SCOPE_IDENTITY()` (o `OUTPUT INSERTED.IdCliente`, visto en 7.2) se limita a tu propia sentencia.
+
 **Por qué se usan:** centralizan lógica de acceso a datos en la propia BD, reducen el tráfico de red (una sola llamada en vez de varias consultas), y en muchas empresas siguen siendo el estándar para operaciones críticas.
 
+> 🧠 **Mentalidad Java → C#:** desde Spring los llamabas con `@Procedure` en un repositorio de Spring Data o con `SimpleJdbcCall`. Desde .NET se llaman con ADO.NET o Dapper (sección siguiente), o con `FromSql` en EF Core cuando devuelven filas de una entidad.
+
 ---
 
-## 7.9 Diferencias prácticas Oracle vs SQL Server
+## 7.9 SQL desde C#: ADO.NET, Dapper y EF Core
 
-| Aspecto | Oracle | SQL Server (T-SQL) |
+EF Core (Lección 8) cubre la mayoría de los casos, pero en proyectos reales convive con SQL escrito a mano: consultas de informes muy optimizadas, procedimientos almacenados heredados, operaciones masivas. En .NET hay tres niveles.
+
+| Nivel | Qué es | Equivalente Java |
 |---|---|---|
-| Auto-incremento | `SEQUENCE` + `TRIGGER`, o `GENERATED ALWAYS AS IDENTITY` | `IDENTITY(1,1)` |
-| Limitar filas | `WHERE ROWNUM <= 10` (o `FETCH FIRST 10 ROWS ONLY`) | `SELECT TOP 10` |
-| Concatenar texto | `\|\|` | `+` o `CONCAT()` |
-| Fecha actual | `SYSDATE` | `GETDATE()` |
-| Booleano | No existe nativo, se usa `NUMBER(1)` | `BIT` |
-| Cadena de texto | `VARCHAR2` | `NVARCHAR` |
+| **ADO.NET** | La API base: conexión, comando, lector de filas | JDBC (`Connection`, `PreparedStatement`, `ResultSet`) |
+| **Dapper** | Micro-ORM: tú escribes el SQL, él mapea las filas a objetos | `JdbcTemplate` con `RowMapper`, o MyBatis |
+| **EF Core** | ORM completo, con SQL crudo cuando hace falta | JPA/Hibernate con `@Query(nativeQuery = true)` |
+
+**Paquetes por motor:**
+
+| Motor | Driver ADO.NET | Proveedor EF Core |
+|---|---|---|
+| PostgreSQL | `Npgsql` | `Npgsql.EntityFrameworkCore.PostgreSQL` |
+| MySQL | `MySqlConnector` (recomendado) o `MySql.Data` (de Oracle) | `Pomelo.EntityFrameworkCore.MySql` (usa MySqlConnector) |
+| SQL Server | `Microsoft.Data.SqlClient` | `Microsoft.EntityFrameworkCore.SqlServer` |
+| Oracle | `Oracle.ManagedDataAccess.Core` | `Oracle.EntityFrameworkCore` |
+
+### ADO.NET (PostgreSQL con Npgsql)
+
+```csharp
+public async Task<List<ClienteDto>> ObtenerActivosPorPaisAsync(string pais, CancellationToken ct)
+{
+    await using var conexion = new NpgsqlConnection(_cadenaConexion);
+    await conexion.OpenAsync(ct);
+
+    await using var comando = new NpgsqlCommand(
+        "SELECT IdCliente, NombreCliente, Email FROM Clientes WHERE Pais = @pais AND Activo = TRUE ORDER BY NombreCliente",
+        conexion);
+    comando.Parameters.AddWithValue("pais", pais);          // SIEMPRE parámetros, nunca concatenar
+
+    var resultado = new List<ClienteDto>();
+    await using var lector = await comando.ExecuteReaderAsync(ct);
+    while (await lector.ReadAsync(ct))
+    {
+        resultado.Add(new ClienteDto(
+            lector.GetInt32(0),
+            lector.GetString(1),
+            lector.IsDBNull(2) ? null : lector.GetString(2)));
+    }
+    return resultado;
+}
+```
+
+Con MySQL el código es idéntico cambiando `NpgsqlConnection`/`NpgsqlCommand` por `MySqlConnection`/`MySqlCommand`, y con SQL Server por `SqlConnection`/`SqlCommand`. Todas heredan de las mismas clases base (`DbConnection`, `DbCommand`), igual que todos los drivers JDBC implementan las mismas interfaces.
+
+### Dapper: el mismo resultado en tres líneas
+
+```bash
+dotnet add package Dapper
+```
+
+```csharp
+public async Task<IReadOnlyList<ClienteDto>> ObtenerActivosPorPaisAsync(string pais, CancellationToken ct)
+{
+    await using var conexion = new NpgsqlConnection(_cadenaConexion);   // o MySqlConnection, o SqlConnection
+
+    var clientes = await conexion.QueryAsync<ClienteDto>(new CommandDefinition(
+        "SELECT IdCliente, NombreCliente, Email FROM Clientes WHERE Pais = @Pais AND Activo = TRUE ORDER BY NombreCliente",
+        new { Pais = pais },                                                // parámetros con un objeto anónimo
+        cancellationToken: ct));
+
+    return clientes.AsList();
+}
+
+// Llamar al procedimiento de MySQL de 7.8
+var parametros = new DynamicParameters();
+parametros.Add("p_nombre", "Ana García");
+parametros.Add("p_email", "ana@example.com");
+parametros.Add("p_pais", "España");
+parametros.Add("p_id_nuevo", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+await conexion.ExecuteAsync("sp_insertar_cliente", parametros, commandType: CommandType.StoredProcedure);
+var idNuevo = parametros.Get<int>("p_id_nuevo");
+```
+
+Dapper abre la conexión si está cerrada y mapea cada columna a la propiedad (o parámetro del constructor del `record`) con el mismo nombre.
+
+(Si las tablas las creó EF Core en PostgreSQL, en el SQL escrito a mano los nombres van entre comillas: `"Clientes"`, `"Pais"`. Ver el aviso de mayúsculas en 7.1.)
+
+### SQL crudo dentro de EF Core
+
+```csharp
+// Devuelve entidades a partir de SQL propio (debe devolver todas las columnas de la entidad)
+var clientes = await _db.Clientes
+    .FromSql($"SELECT * FROM Clientes WHERE Pais = {pais} AND Activo = TRUE")   // la interpolación se convierte en parámetro, NO se concatena
+    .AsNoTracking()
+    .ToListAsync(ct);
+
+// Tipos que no son entidades (EF Core 8+)
+var totales = await _db.Database
+    .SqlQuery<TotalPorPais>($"SELECT Pais, COUNT(*) AS Total FROM Clientes GROUP BY Pais")
+    .ToListAsync(ct);
+
+// Sentencias que no devuelven filas
+await _db.Database.ExecuteSqlAsync($"CALL sp_desactivar_cliente({idCliente})", ct);
+```
+
+> ⚠️ **Cuidado — inyección SQL, el error que no se perdona:** jamás construyas SQL concatenando lo que llega del usuario:
+> ```csharp
+> var sql = "SELECT * FROM Clientes WHERE Pais = '" + pais + "'";     // ❌ pais = "x' OR '1'='1"  → devuelve todo
+> ```
+> Usa siempre parámetros: `@pais` en ADO.NET, el objeto anónimo en Dapper, o `FromSql($"...")` en EF Core. Ojo con este último: `FromSql` e `ExecuteSqlAsync` reciben un `FormattableString` y parametrizan la interpolación, pero **`FromSqlRaw` y `ExecuteSqlRawAsync` no**: con ellos, un `$"...{pais}"` se concatena literalmente. Si ves `Raw` con interpolación en un code review, es un comentario bloqueante.
+
+> 💡 **Tip — cuándo usar cada uno:** EF Core para el día a día (CRUD, casos de uso con reglas de negocio); Dapper para lecturas complejas o muy optimizadas, informes y procedimientos heredados; ADO.NET directo solo cuando necesitas algo que ninguno de los dos da (operaciones masivas con `COPY` de Npgsql o `MySqlBulkCopy`, por ejemplo). Es muy habitual que un mismo proyecto use EF Core para escribir y Dapper para leer.
 
 ---
 
-## 7.10 Ejercicios Lección 7
+## 7.10 Diferencias prácticas entre motores
+
+| Aspecto | MySQL | PostgreSQL | SQL Server (T-SQL) | Oracle |
+|---|---|---|---|---|
+| Auto-incremento | `AUTO_INCREMENT` | `GENERATED ALWAYS AS IDENTITY` (o `SERIAL`, forma antigua) | `IDENTITY(1,1)` | `SEQUENCE` + `TRIGGER`, o `GENERATED ALWAYS AS IDENTITY` |
+| Limitar filas | `LIMIT 10` | `LIMIT 10` o `FETCH FIRST 10 ROWS ONLY` | `SELECT TOP 10` u `OFFSET ... FETCH` | `WHERE ROWNUM <= 10` (o `FETCH FIRST 10 ROWS ONLY`) |
+| Concatenar texto | `CONCAT()` | `\|\|` o `CONCAT()` | `+` o `CONCAT()` | `\|\|` |
+| Fecha actual | `NOW()` / `CURRENT_TIMESTAMP` | `now()` / `CURRENT_TIMESTAMP` | `GETDATE()` | `SYSDATE` |
+| Booleano | `BOOLEAN` (alias de `TINYINT(1)`) | `BOOLEAN` real (`TRUE`/`FALSE`) | `BIT` | No existe nativo, se usa `NUMBER(1)` (`BOOLEAN` solo desde 23ai) |
+| Cadena de texto | `VARCHAR` (con `utf8mb4`) | `VARCHAR` o `TEXT` | `NVARCHAR` | `VARCHAR2` |
+| Comillas para identificadores | `` `backticks` `` | `"dobles"` | `[corchetes]` | `"dobles"` |
+| Identificadores sin comillas | Tablas sensibles a mayúsculas en Linux | Se pasan a minúsculas | Normalmente insensibles | Se pasan a MAYÚSCULAS |
+| Comparar texto | Insensible a mayúsculas (collation `_ci`) | Sensible (`ILIKE` para ignorarlas) | Insensible (collation por defecto) | Sensible |
+| Id recién insertado | `LAST_INSERT_ID()` | `RETURNING` | `OUTPUT INSERTED` / `SCOPE_IDENTITY()` | `RETURNING ... INTO` |
+| Upsert | `ON DUPLICATE KEY UPDATE` | `ON CONFLICT ... DO UPDATE` | `MERGE` | `MERGE` |
+| Agregar texto de un grupo | `GROUP_CONCAT` | `STRING_AGG` | `STRING_AGG` (2017+) | `LISTAGG` |
+| `FULL OUTER JOIN` | No (se emula con `UNION`) | Sí | Sí | Sí |
+| DDL dentro de transacción | No (commit implícito) | Sí | Sí | No (commit implícito) |
+| Driver .NET | `MySqlConnector` | `Npgsql` | `Microsoft.Data.SqlClient` | `Oracle.ManagedDataAccess.Core` |
+| Proveedor EF Core | `Pomelo.EntityFrameworkCore.MySql` | `Npgsql.EntityFrameworkCore.PostgreSQL` | `Microsoft.EntityFrameworkCore.SqlServer` | `Oracle.EntityFrameworkCore` |
+| Servicio gestionado en la nube | Azure Database for MySQL, Amazon RDS / Aurora MySQL | Azure Database for PostgreSQL, Amazon RDS / Aurora PostgreSQL | Azure SQL Database, Amazon RDS for SQL Server | Amazon RDS for Oracle |
+
+> 💡 **Tip:** la última fila importa para SEIDEL, que despliega en Azure y AWS: en la práctica, sus bases de datos MySQL y PostgreSQL pueden estar en servicios gestionados como estos. Para tu código cambia poco (una cadena de conexión con SSL obligatorio). Lo que sí cambia es que **no tienes acceso al servidor**: ni a sus archivos ni a su configuración. Los ajustes se hacen desde el portal o con parámetros del servicio.
+
+---
+
+## 7.11 Ejercicios Lección 7
 
 1. Crea las tablas `Clientes` y `Pedidos` con sus relaciones (FK)
 2. Inserta al menos 5 clientes y 8 pedidos
@@ -1968,6 +2345,13 @@ SELECT @NuevoId;
 5. Crea un índice sobre la columna `Email` de `Clientes`
 6. Escribe una subconsulta que obtenga el nombre de los clientes cuyo gasto total supere el promedio de todos los clientes
 7. Escribe un procedimiento almacenado que reciba un país y devuelva el número de clientes activos en ese país
+8. Levanta PostgreSQL y MySQL con Docker y repite los ejercicios 1-7 en los dos. Anota cada sentencia que tuviste que cambiar y por qué
+9. En PostgreSQL, busca un cliente con `LIKE 'ana%'` (en minúsculas) y comprueba que no aparece; arréglalo de dos formas (`ILIKE` y `lower()` con un índice sobre la expresión)
+10. Intenta un `FULL OUTER JOIN` en MySQL, lee el error y reescríbelo con `UNION`
+11. Escribe el upsert de un cliente por `Email` en PostgreSQL y en MySQL, y ejecútalo dos veces seguidas con nombres distintos
+12. Con funciones de ventana, obtén el último pedido de cada cliente y su total acumulado
+13. Ejecuta `EXPLAIN ANALYZE` sobre una búsqueda por `Email` antes y después de crear el índice del ejercicio 5 y compara el plan
+14. Escribe en C# con Dapper y `Npgsql` un método que devuelva los clientes activos de un país, con parámetros. Después intenta la versión concatenada con el valor `x' OR '1'='1` y observa qué devuelve
 
 ---
 
@@ -1999,6 +2383,15 @@ dotnet add package Microsoft.EntityFrameworkCore.SqlServer
 dotnet add package Microsoft.EntityFrameworkCore.Tools
 dotnet add package Microsoft.EntityFrameworkCore.Design
 ```
+
+El paquete del proveedor depende del motor. Los ejemplos de esta lección usan SQL Server; para los motores de SEIDEL:
+
+```bash
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL      # PostgreSQL → options.UseNpgsql(cadena)
+dotnet add package Pomelo.EntityFrameworkCore.MySql           # MySQL      → options.UseMySql(cadena, ServerVersion.AutoDetect(cadena))
+```
+
+Todo lo demás de esta lección (DbContext, consultas LINQ, migraciones) es igual para cualquier proveedor. Las diferencias que sí importan están en la [[#Lección 7: SQL — MySQL, PostgreSQL y SQL Server|Lección 7]] y en la [[#11.4 Interfaces en Domain, implementación en Infrastructure|Lección 11.4]].
 
 ---
 
@@ -6180,7 +6573,7 @@ npx tsc --watch          # recompila automáticamente al guardar
 
 **Arquitectura y datos**
 - **Patrones de diseño**: Repository, Dependency Injection (y sus lifetimes), Factory, Singleton, Strategy, Decorator
-- **SQL**: Oracle y T-SQL, joins, agregaciones, subconsultas, índices y planes de ejecución
+- **SQL**: MySQL, PostgreSQL, SQL Server y Oracle — joins, agregaciones, subconsultas, funciones de ventana, índices, planes de ejecución, upsert y SQL desde C# con ADO.NET y Dapper
 - **Entity Framework Core**: LINQ → SQL automático, change tracking, `AsNoTracking()`, el problema N+1, transacciones explícitas y concurrencia optimista
 - **ASP.NET Core Web API**: controladores, minimal APIs, DTOs, validación, códigos HTTP, middleware, `ProblemDetails` y Swagger
 - **Arquitectura de backend**: capas y regla de dependencia, Clean/Onion/Hexagonal, proyectos por capa, DI a fondo y *captive dependency*, tests de arquitectura, Vertical Slice
