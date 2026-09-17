@@ -67,4 +67,11 @@ public class RegatasController : ControllerBase
         await _regataService.DesinscribirBarcoAsync(regataId, barcoId, ct);
         return NoContent();
     }
+
+        /// <summary>Total de tripulantes inscritos en la regata, sumando los de todos sus barcos.</summary>
+    [HttpGet("{id:long}/tripulantes-totales")]
+    [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<int>> GetTripulantesTotales(long id, CancellationToken ct) =>
+        Ok(await _regataService.ContarTripulantesTotalesAsync(id, ct));
 }
