@@ -11,15 +11,16 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // ── DbContext (equivalente a application.properties: spring.datasource.*) ──
-// Usamos SQL Server (no MySQL como en el tutorial Java original) para practicar
-// EF Core con un motor distinto al del tutorial. En SEIDEL se trabaja con
-// MySQL y PostgreSQL: cambiar de proveedor es sustituir el paquete NuGet y
-// UseSqlServer por UseMySql (Pomelo) o UseNpgsql (Lección 11.4 de la guía).
+// Migrado de SQL Server a MySQL (Pomelo) para alinear el proyecto con el
+// stack de SEIDEL. ServerVersion.AutoDetect() consulta al servidor su
+// versión al arrancar, porque Pomelo genera SQL distinto según la versión
+// de MySQL (soporte de JSON, funciones de ventana, etc.), igual que
+// Hibernate elegía el dialecto (MySQL8Dialect) según la base de datos.
 var connectionString = builder.Configuration.GetConnectionString("MarinaDb")
     ?? throw new InvalidOperationException("Falta la cadena de conexión 'MarinaDb' en appsettings.json");
 
 builder.Services.AddDbContext<MarinaDbContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
 // ── Inyección de dependencias (equivalente a que Spring detecte @Service/@Repository) ──
 // En ASP.NET Core no hay escaneo automático de componentes: cada servicio se

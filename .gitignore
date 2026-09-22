@@ -8,3 +8,6 @@ obj/
 
 # Rider / JetBrains
 .idea/
+
+# Archivos con contraseñas/secretos (no se comparten)
+contrasenas.txt
