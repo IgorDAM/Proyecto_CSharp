@@ -42,11 +42,11 @@ Ya conoces el problema desde tu Capítulo 1 de Java: el **desajuste objeto-relac
 |---|---|---|
 | Especificación | JPA | No existe una "especificación" separada — EF Core es a la vez la interfaz y la implementación |
 | Implementación ORM | Hibernate | Entity Framework Core |
-| Motor de BD | MySQL (en tu tutorial) | **SQL Server** en MarinaApi (en SEIDEL: MySQL y PostgreSQL) |
+| Motor de BD | MySQL (en tu tutorial) | **MySQL** en MarinaApi desde el 2026-09-22 (antes SQL Server; en SEIDEL: MySQL y PostgreSQL) |
 | Gestor de sesión/contexto | `Session` / `SessionFactory` | `DbContext` |
 | Colección de entidades | `session.createQuery("from Barco")` | `DbSet<Barco>` |
 
-> **Vocabulario:** en Java, JPA es la "receta" y Hibernate el "cocinero" (Cap. 1.4-1.5). En C# **no existe esa separación**: EF Core es receta y cocinero a la vez. Esto simplifica las cosas — no hay que elegir "implementación", solo instalar el paquete NuGet del proveedor de tu base de datos (`Microsoft.EntityFrameworkCore.SqlServer`).
+> **Vocabulario:** en Java, JPA es la "receta" y Hibernate el "cocinero" (Cap. 1.4-1.5). En C# **no existe esa separación**: EF Core es receta y cocinero a la vez. Esto simplifica las cosas — no hay que elegir "implementación", solo instalar el paquete NuGet del proveedor de tu base de datos (`Pomelo.EntityFrameworkCore.MySql` en MarinaApi desde el 2026-09-22; ver 2.6 para el cambio de proveedor).
 
 ## 1.2. El concepto central: `DbContext`
 
@@ -94,11 +94,12 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 ## 2.1. El equivalente al `pom.xml`: `.csproj`
 
 ```xml
-<!-- Ver archivo del proyecto: MarinaApi.csproj -->
+<!-- Ver archivo del proyecto: MarinaApi.csproj (actualizado 2026-09-22, migración a MySQL — ver 2.6) -->
 <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.13" /> <!-- ya no se usa, pendiente de quitar -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.3" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
 </ItemGroup>
 ```
@@ -112,10 +113,10 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 ## 2.2. El equivalente a `application.properties`: `appsettings.json`
 
 ```json
-// Ver archivo del proyecto: appsettings.json
+// Ver archivo del proyecto: appsettings.json (actualizado 2026-09-22)
 {
   "ConnectionStrings": {
-    "MarinaDb": "Server=localhost,1433;Database=gestion_maritima;User Id=sa;Password=TuPassword123!;TrustServerCertificate=True;"
+    "MarinaDb": "Server=localhost;Port=3306;Database=gestion_maritima;User=root;Password=marinaMySQL123;"
   }
 }
 ```
@@ -128,7 +129,7 @@ spring.datasource.username=root
 spring.datasource.password=root
 ```
 
-> **CUIDADO:** el proyecto usa **SQL Server**, no MySQL como el tutorial Java original, así que nuestro `Program.cs` usa `UseSqlServer(...)`. Si copias ejemplos de internet con `UseMySql(...)` o `UseNpgsql(...)`, no funcionarán tal cual aquí. En SEIDEL, que trabaja con MySQL y PostgreSQL, será al revés: esos son los proveedores que te encontrarás. Cómo cambiar de uno a otro está en la Lección 11.4 de `GUIA_DEFINITIVA_CSHARP_1.md`.
+> **Nota (actualizada 2026-09-22):** el proyecto empezó con **SQL Server** para practicar EF Core con un motor distinto al del tutorial Java. El 2026-09-22 se migró a **MySQL** (con Pomelo), que es lo que se usa en SEIDEL — ver el detalle completo en la sección 2.6. `Program.cs` usa ahora `UseMySql(...)`. Si en documentación antigua o en internet ves `UseSqlServer(...)`, es el proveedor que este proyecto tenía antes de esa fecha.
 
 ## 2.3. `Program.cs`: el equivalente a la autoconfiguración de Spring Boot
 
@@ -256,6 +257,47 @@ BarcoRegata  ← Tabla intermedia N:M (generada automáticamente por EF Core)
 3. **Revierte una migración:** `dotnet ef database update InitialCreate` (vuelve a la primera migración) y `dotnet ef database update` (vuelve a la última)
 
 - **Checkpoint:** debes entender que en C# **no hay autoconfiguración mágica** como en Spring Boot — todo se declara explícitamente en `Program.cs`, y eso es una decisión de diseño, no una carencia. Las migraciones son explícitas y versionables, lo que es mejor para equipos.
+
+## 2.6. Migración de SQL Server a MySQL (2026-09-22)
+
+El proyecto empezó en SQL Server para practicar EF Core con un motor distinto al de tu tutorial Java. El 2026-09-22 se migró a MySQL (con Pomelo.EntityFrameworkCore.MySql), alineándolo con el stack real de SEIDEL. Cambiar de proveedor en EF Core toca cuatro sitios:
+
+**1. El paquete NuGet.** `Microsoft.EntityFrameworkCore.SqlServer` → `Pomelo.EntityFrameworkCore.MySql` (no hay proveedor MySQL oficial de Microsoft; Pomelo es el estándar de facto, como `mysql-connector-j` frente a `mssql-jdbc` en Java/Maven).
+
+> **Cuidado con las versiones:** las versiones de Pomelo no siempre coinciden con las de los paquetes `Microsoft.EntityFrameworkCore.*`. Si añades Pomelo sin fijar versión, NuGet puede intentar instalar una que pida una versión de `Microsoft.EntityFrameworkCore` más nueva que la que ya tienes fijada en el proyecto, y falla con `NU1605: Degradación del paquete detectada`. Se resuelve fijando explícitamente la versión de Pomelo (`dotnet add package Pomelo.EntityFrameworkCore.MySql --version X.Y.Z`) y subiendo `Microsoft.EntityFrameworkCore`, `.SqlServer` y `.Design` a una versión compatible — ojo, `Microsoft.EntityFrameworkCore` puede estar referenciado directamente en el `.csproj` además de venir arrastrado por `.SqlServer`/`.Design`, y hay que actualizar esa referencia directa también o el conflicto persiste.
+
+**2. `Program.cs`.**
+
+```csharp
+// Antes
+options.UseSqlServer(connectionString)
+
+// Después
+options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+```
+
+`ServerVersion.AutoDetect()` se conecta a la base de datos al arrancar la aplicación para averiguar qué versión de MySQL/MariaDB hay al otro lado, porque el dialecto SQL que genera Pomelo cambia según la versión (soporte de JSON, funciones de ventana, etc.). Es el equivalente en tiempo de ejecución a fijar `hibernate.dialect=MySQL8Dialect` a mano en Java.
+
+**3. La cadena de conexión.** Cambia la sintaxis (ver 2.2): `Server=host,puerto` → `Server=host;Port=puerto`, `User Id=` → `User=`, y desaparece `TrustServerCertificate` (específico de `Microsoft.Data.SqlClient`).
+
+**4. Las migraciones.** Aquí está la trampa: **las migraciones no son portables entre proveedores de EF Core.** Cada migración lleva grabado el SQL y las anotaciones específicas del motor para el que se generó (`.Annotation("SqlServer:Identity", ...)`, tipos `nvarchar`/`bit`/`float`...). Al cambiar de proveedor hay que borrar la carpeta `Migrations/` entera (incluido `*ModelSnapshot.cs`) y generar una migración `InitialCreate` nueva contra el proveedor nuevo con `dotnet ef migrations add` + `dotnet ef database update`. El modelo (tus clases `Barco`, `Regata`, etc.) sigue siendo la fuente de verdad; lo que se pierde es solo el historial de cómo se construyó el esquema, no el esquema en sí.
+
+**Diferencias de tipos que genera EF Core, SQL Server → MySQL** (comparando las migraciones antes y después):
+
+| Concepto | SQL Server | MySQL | Por qué |
+|---|---|---|---|
+| Autoincremento de PK | `.Annotation("SqlServer:Identity", "1, 1")` → `IDENTITY(1,1)` | `MySqlValueGenerationStrategy.IdentityColumn` → `AUTO_INCREMENT` | Mismo concepto, cada motor lo expresa a su manera (como en Hibernate con `GenerationType.IDENTITY` sobre el autoincremento nativo de cada BD) |
+| Texto | `nvarchar(N)` (el prefijo `n` = Unicode/UTF-16 por columna) | `varchar(N)` + `.Annotation("MySql:CharSet", "utf8mb4")` | MySQL no tiene prefijo Unicode por columna; fija el *charset* aparte. `utf8mb4` es el UTF-8 completo (4 bytes, soporta emojis); el `utf8` de MySQL a secas es una versión recortada de 3 bytes |
+| Booleano | `bit` (tipo nativo) | `tinyint(1)` | MySQL no tiene tipo booleano real: `BOOLEAN` es solo un alias de `TINYINT(1)` (guarda 0/1) |
+| Coma flotante | `float` | `double` | Solo cambia el nombre: el `float` de SQL Server es lo que el estándar SQL (y MySQL) llaman `double precision` (8 bytes) — no es un cambio real de precisión |
+
+**Docker en local:** en vez de un `docker-compose.yml`, para MySQL basta con:
+
+```powershell
+docker run --name marina-mysql -e MYSQL_ROOT_PASSWORD=marinaMySQL123 -e MYSQL_DATABASE=gestion_maritima -p 3306:3306 -d mysql:8.0
+```
+
+- **Checkpoint:** cambiar de proveedor EF Core no es solo "cambiar una línea" — toca el paquete, la configuración, el código de arranque y obliga a regenerar el historial de migraciones. Pero el modelo, los repositorios, los servicios y los controllers no cambian ni una línea: esa es la promesa de EF Core (y de cualquier ORM) como capa de abstracción sobre el motor de base de datos concreto.
 
 ---
 
@@ -2503,7 +2545,7 @@ catch (NotFoundException ex)
 | Manejo de "no encontrado" | `if (x == null) return 404` en cada método | Excepción + Middleware global |
 | Testing | JUnit 5 + Mockito | xUnit + Moq + FluentAssertions |
 | Documentación API | Springdoc OpenAPI | Swashbuckle |
-| Motor de BD | MySQL (tutorial) | **SQL Server** (MarinaApi; en SEIDEL, MySQL y PostgreSQL) |
+| Motor de BD | MySQL (tutorial) | **MySQL** (MarinaApi, desde 2026-09-22 — antes SQL Server; en SEIDEL, MySQL y PostgreSQL) |
 
 ## 15.2. Cómo sigue encajando con tu plan de verano
 
