@@ -28,8 +28,8 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         await _dbSet.FindAsync(new object[] { id }, ct);
 
     // Equivalente a session.createQuery("from T", T.class).getResultList()
-    public virtual async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
-       await _dbSet.ToListAsync(ct);
+    public async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
+        await _dbSet.ToListAsync(ct);
 
     // Equivalente a las consultas HQL personalizadas del Capítulo 8, pero
     // expresadas como lambda LINQ en vez de strings HQL con nombres de atributo.

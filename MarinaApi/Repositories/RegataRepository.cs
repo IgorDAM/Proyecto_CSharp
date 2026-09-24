@@ -26,19 +26,11 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
         _context = context;
     }
 
-    public override async Task<List<Regata>> FindAllAsync(CancellationToken ct = default) =>
-    await _context.Regatas
-        .Include(r => r.Barcos)
-        .ToListAsync(ct);
-
     public async Task<Regata?> FindByNombreAsync(string nombre, CancellationToken ct = default) =>
         await _context.Regatas.FirstOrDefaultAsync(r => r.Nombre == nombre, ct);
 
     public async Task<List<Regata>> FindByLugarAsync(string lugar, CancellationToken ct = default) =>
-       await _context.Regatas
-           .Include(r => r.Barcos)
-           .Where(r => r.Lugar == lugar)
-           .ToListAsync(ct);
+        await _context.Regatas.Where(r => r.Lugar == lugar).ToListAsync(ct);
 
     public async Task<List<Regata>> FindByDistanciaGreaterThanAsync(int distancia, CancellationToken ct = default) =>
         await _context.Regatas.Where(r => r.Distancia > distancia).ToListAsync(ct);
