@@ -1,18 +1,8 @@
-function mostrarMensaje(texto, tipo) {
-    const mensaje = document.getElementById("mensaje");
-    mensaje.textContent = texto;
-    mensaje.className = `alert alert-${tipo}`;
-}
+import { mostrarMensaje, obtenerDatos } from "./comun.js";
 
 async function cargarBarcos() {
     try {
-        const respuesta = await fetch("/api/barcos");
-
-        if (!respuesta.ok) {
-            throw new Error(`La API respondió ${respuesta.status}`);
-        }
-
-        const barcos = await respuesta.json();
+        const barcos = await obtenerDatos("/api/barcos");
 
         if (barcos.length === 0) {
             mostrarMensaje("No hay barcos registrados.", "info");
