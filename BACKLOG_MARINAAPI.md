@@ -29,8 +29,9 @@
 | **#168** | CORS restringido por configuración | Producción | 🟢 | 1 | — | ⬜ |
 | **#169** | Versionado de la API (v1 explícita) | Producción | 🟢 | 3 | — | ⬜ |
 | **#170** | Formato y comentarios de `MarinaDbContext`, `BarcoRepository` y tests | Chore | 🟢 | 1 | — | ⬜ |
+| **#171** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ⬜ |
 
-**Total: 40 puntos.** Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 43 puntos.** Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**. El #171 va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 14 pts):** #154, #155, #156, #157, #159, #161, #162
@@ -230,3 +231,17 @@
   - [ ] `dotnet format` ejecutado sobre la solución.
   - [ ] Comentarios corregidos para que describan lo que hace el código.
   - [ ] Opcional: añadir `.editorconfig` para que el formato no dependa de cada IDE.
+
+### #171 — Frontend simple de solo lectura (HTML + Bootstrap + JS)
+
+- **Tipo:** Feature · **Puntos:** 3
+- **Contexto:** MarinaApi solo se puede usar desde Swagger. Se añade un frontend mínimo con el mismo stack que SEIDEL indica en su porfolio para su plataforma web de gestión de eventos deportivos (.NET + REST API + MySQL, con HTML/CSS, JavaScript y Bootstrap en el front).
+- **Decisión:** las páginas viven en `MarinaApi/wwwroot/` y las sirve la propia API, en el mismo origen. No hace falta CORS, así que no condiciona al #168.
+- **Criterios de aceptación:**
+  - [ ] `Program.cs` sirve `wwwroot` (`UseDefaultFiles` + `UseStaticFiles`).
+  - [ ] `index.html` con barra de navegación Bootstrap.
+  - [ ] Listado de Barcos (`GET /api/barcos`) en una tabla.
+  - [ ] Listado de Regatas (`GET /api/regatas`), mostrando `totalBarcosInscritos`.
+  - [ ] Listado de Tripulantes (`GET /api/tripulantes`).
+  - [ ] Mensaje visible si la API falla o la lista viene vacía.
+- **Fuera de alcance:** crear, editar y borrar desde el frontend (ticket aparte si se quiere más adelante).
