@@ -73,6 +73,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors();
 app.UseHttpsRedirection();
+// ── Frontend estático (wwwroot) ──
+// Equivalente a src/main/resources/static/ en Spring Boot.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseAuthorization();
 app.MapControllers();
 
