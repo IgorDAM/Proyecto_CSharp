@@ -40,23 +40,22 @@ public class RegataServiceTests
 
 
     [Fact]
-    public async Task FindAllAsync_MapeaTodasLasEntidadesADto()
+    public async Task FindAllAsync_DevuelveLasRegatasDelRepositorio()
     {
         // Arrange
-        var regatas = new List<Regata>
+        var regatas = new List<RegataDto>
         {
-            new() { Id = 1, Nombre = "Regata A", Lugar = "Gijón", Distancia = 20 },
-            new() { Id = 2, Nombre = "Regata B", Lugar = "Avilés", Distancia = 30 }
+            new(1, "Regata A", "Gijón", new DateOnly(2026, 10, 1), 20, 2),
+            new(2, "Regata B", "Avilés", new DateOnly(2026, 10, 8), 30, 0)
         };
-        _regataRepositoryMock.Setup(r => r.FindAllAsync(It.IsAny<CancellationToken>()))
+        _regataRepositoryMock.Setup(r => r.FindAllConContadorAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(regatas);
 
         // Act
         var resultado = await _service.FindAllAsync();
 
         // Assert
-        resultado.Should().HaveCount(2);
-        resultado.Select(r => r.Nombre).Should().Contain(new[] { "Regata A", "Regata B" });
+        resultado.Should().BeEquivalentTo(regatas);
     }
 
     [Fact]
@@ -114,18 +113,18 @@ public class RegataServiceTests
     public async Task FindByLugarAsync_DevuelveRegatasDelLugar()
     {
         // Arrange
-        var regatas = new List<Regata>
+        var regatas = new List<RegataDto>
         {
-            new() { Id = 1, Nombre = "Regata A", Lugar = "Gijón", Distancia = 20 }
+            new(1, "Regata A", "Gijón", new DateOnly(2026, 10, 1), 20, 2)
         };
-        _regataRepositoryMock.Setup(r => r.FindByLugarAsync("Gijón", It.IsAny<CancellationToken>()))
+        _regataRepositoryMock.Setup(r => r.FindByLugarConContadorAsync("Gijón", It.IsAny<CancellationToken>()))
             .ReturnsAsync(regatas);
 
         // Act
         var resultado = await _service.FindByLugarAsync("Gijón");
 
         // Assert
-        resultado.Should().HaveCount(1);
+        resultado.Should().BeEquivalentTo(regatas);
         resultado[0].Lugar.Should().Be("Gijón");
     }
 

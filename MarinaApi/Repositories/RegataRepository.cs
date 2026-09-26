@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MarinaApi.Data;
 using MarinaApi.Models;
+using MarinaApi.Dtos;
+using MarinaApi.Mapping;
 
 namespace MarinaApi.Repositories;
 
@@ -11,6 +13,8 @@ public interface IRegataRepository : IGenericRepository<Regata>
     Task<List<Regata>> FindByLugarAsync(string lugar, CancellationToken ct = default);
     Task<List<Regata>> FindByDistanciaGreaterThanAsync(int distancia, CancellationToken ct = default);
     Task<Regata?> FindByIdWithBarcosAsync(long id, CancellationToken ct = default);
+    Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default);
+    Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default);
 }
 
 public class RegataRepository : GenericRepository<Regata>, IRegataRepository
@@ -33,4 +37,15 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
 
     public async Task<Regata?> FindByIdWithBarcosAsync(long id, CancellationToken ct = default) =>
         await _context.Regatas.Include(r => r.Barcos).FirstOrDefaultAsync(r => r.Id == id, ct);
+
+    public async Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default) =>
+await _context.Regatas
+    .Select(RegataMapper.ToDtoProjection)
+    .ToListAsync(ct);
+
+    public async Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default) =>
+        await _context.Regatas
+            .Where(r => r.Lugar == lugar)
+            .Select(RegataMapper.ToDtoProjection)
+            .ToListAsync(ct);
 }

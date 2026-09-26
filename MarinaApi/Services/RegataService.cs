@@ -38,7 +38,7 @@ public class RegataService : IRegataService
     }
 
     public async Task<List<RegataDto>> FindAllAsync(CancellationToken ct = default) =>
-        (await _regataRepository.FindAllAsync(ct)).Select(r => r.ToDto()).ToList();
+     await _regataRepository.FindAllConContadorAsync(ct);
 
     public async Task<RegataDto> FindByIdAsync(long id, CancellationToken ct = default)
     {
@@ -54,7 +54,7 @@ public class RegataService : IRegataService
     }
 
     public async Task<List<RegataDto>> FindByLugarAsync(string lugar, CancellationToken ct = default) =>
-        (await _regataRepository.FindByLugarAsync(lugar, ct)).Select(r => r.ToDto()).ToList();
+     await _regataRepository.FindByLugarConContadorAsync(lugar, ct);
 
     /// <summary>
     /// Inscribe un barco en una regata (relación N:M). Equivalente a
