@@ -1177,6 +1177,47 @@ var resumen = await _context.Barcos
     .ToListAsync();
 ```
 
+### Caso real: agregación sobre navegaciones (ticket 152)
+
+El total de tripulantes de una regata cruza dos relaciones: Regata↔Barco (N:M) y Barco↔Tripulante (1:N). La primera versión lo calculaba en C#, con una consulta por barco (un N+1). La versión final (PR #6) deja que lo calcule la base de datos en **una sola consulta**.
+
+**Java (HQL):**
+```java
+@Query("SELECT COUNT(t) FROM Regata r JOIN r.barcos b JOIN b.tripulantes t WHERE r.id = :id")
+long contarTripulantes(@Param("id") Long id);
+```
+
+**C# (LINQ, `MarinaApi/Repositories/RegataRepository.cs`):**
+```csharp
+public async Task<int?> ContarTripulantesAsync(long regataId, CancellationToken ct = default) =>
+    await _context.Regatas
+        .Where(r => r.Id == regataId)
+        .Select(r => (int?)r.Barcos.Sum(b => b.Tripulantes.Count))
+        .FirstOrDefaultAsync(ct);
+```
+
+**SQL generado por Pomelo (MySQL):**
+```sql
+SELECT (
+    SELECT COALESCE(SUM((
+        SELECT COUNT(*) FROM `Tripulantes` AS `t` WHERE `b0`.`Id` = `t`.`BarcoId`)), 0)
+    FROM `BarcoRegata` AS `b`
+    INNER JOIN `Barcos` AS `b0` ON `b`.`BarcosId` = `b0`.`Id`
+    WHERE `r`.`Id` = `b`.`RegatasId`)
+FROM `Regatas` AS `r`
+WHERE `r`.`Id` = @__regataId_0
+LIMIT 1
+```
+
+| Aspecto | Java / Hibernate | C# / EF Core |
+|---|---|---|
+| "No existe" frente a "0" | `COUNT` devuelve `0` en los dos casos: hay que comprobar aparte con `existsById` (2 consultas) | `int?` a `null` si no hay fila, gracias al cast `(int?)`: 1 consulta |
+| Forma del SQL | `JOIN` + `COUNT` | Subconsultas correlacionadas + `COALESCE(SUM(...), 0)`, que EF añade para imitar el `Sum()` de C# (que da `0`, no `null`, sin filas) |
+| Recorrer la N:M | `JOIN r.barcos` explícito | Navegación `r.Barcos`: EF pasa solo por la tabla intermedia `BarcoRegata` |
+| En el Service | `if (!existsById(id)) throw ...` | `?? throw new NotFoundException(...)` |
+
+Las entradas "Proyección a DTO con Select", "Problema N+1" y "Tipos anulables y throw expression" de [[Glosario CSharp]] explican cada pieza por separado.
+
 ## 7.6. Ejercicio
 
 ### Solución: Agregar Consulta de Agregación `GetPromedioEsloraByTipoAsync`
