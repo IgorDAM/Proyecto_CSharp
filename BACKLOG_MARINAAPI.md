@@ -45,7 +45,7 @@
 ### #154 — Borrar un Barco elimina también su Amarre
 
 - **Tipo:** Bug · **Puntos:** 2
-- **Problema:** en [MarinaDbContext.cs](MarinaApi/Data/MarinaDbContext.cs), la relación 1:1 `Amarre → Barco` está configurada con `.OnDelete(DeleteBehavior.Cascade)`. Como la FK `BarcoId` está en `Amarre`, **al borrar un barco se borra la fila del amarre**. Un amarre es infraestructura física del puerto: debería quedar libre (`BarcoId = NULL`), no desaparecer. El comentario del código lo presenta como equivalente a `CascadeType.ALL + orphanRemoval`, pero en la práctica borra el lado que debería sobrevivir.
+- **Problema:** en `MarinaApi/Data/MarinaDbContext.cs`, la relación 1:1 `Amarre → Barco` está configurada con `.OnDelete(DeleteBehavior.Cascade)`. Como la FK `BarcoId` está en `Amarre`, **al borrar un barco se borra la fila del amarre**. Un amarre es infraestructura física del puerto: debería quedar libre (`BarcoId = NULL`), no desaparecer. El comentario del código lo presenta como equivalente a `CascadeType.ALL + orphanRemoval`, pero en la práctica borra el lado que debería sobrevivir.
 - **Criterios de aceptación:**
   - [ ] La relación usa `DeleteBehavior.SetNull`.
   - [ ] Nueva migración generada y revisada (`dotnet ef migrations add AmarreSetNullAlBorrarBarco`).
@@ -67,7 +67,7 @@
 ### #156 — Contraseña de SQL Server en `appsettings.json` y `docker-compose.yml`
 
 - **Tipo:** Seguridad · **Puntos:** 2
-- **Problema:** la cadena de conexión con `User Id=sa;Password=TuPassword123!` está en [appsettings.json](MarinaApi/appsettings.json) y la misma contraseña aparece en [docker-compose.yml](MarinaApi/docker-compose.yml). Las dos están versionadas en GitHub. Aunque sea una contraseña de desarrollo, es justo el hábito que un code review de empresa rechaza (error n.º 8 del resumen final de la guía).
+- **Problema:** la cadena de conexión con `User Id=sa;Password=TuPassword123!` está en `MarinaApi/appsettings.json` y la misma contraseña aparece en `MarinaApi/docker-compose.yml`. Las dos están versionadas en GitHub. Aunque sea una contraseña de desarrollo, es justo el hábito que un code review de empresa rechaza (error n.º 8 del resumen final de la guía).
 - **Criterios de aceptación:**
   - [ ] `appsettings.json` sin credenciales (la clave puede quedar con un valor vacío o un marcador).
   - [ ] Desarrollo: `dotnet user-secrets set "ConnectionStrings:MarinaDb" "..."`.
@@ -93,7 +93,7 @@
 ### #158 — Unit of Work: los repositorios no deben llamar a `SaveChangesAsync`
 
 - **Tipo:** Deuda técnica · **Puntos:** 5
-- **Problema:** [GenericRepository.cs](MarinaApi/Repositories/GenericRepository.cs) llama a `SaveChangesAsync` dentro de `AddAsync`, `UpdateAsync` y `DeleteAsync`. Cada operación es su propia transacción. En cuanto un caso de uso toque dos repositorios (por ejemplo, asignar un amarre y registrar un movimiento en un histórico), un fallo a mitad deja datos a medias sin rollback posible. Además, el comentario del propio método dice que `SaveChangesAsync` "normalmente se llama una sola vez desde el servicio", justo lo contrario de lo que hace el código.
+- **Problema:** `MarinaApi/Repositories/GenericRepository.cs` llama a `SaveChangesAsync` dentro de `AddAsync`, `UpdateAsync` y `DeleteAsync`. Cada operación es su propia transacción. En cuanto un caso de uso toque dos repositorios (por ejemplo, asignar un amarre y registrar un movimiento en un histórico), un fallo a mitad deja datos a medias sin rollback posible. Además, el comentario del propio método dice que `SaveChangesAsync` "normalmente se llama una sola vez desde el servicio", justo lo contrario de lo que hace el código.
 - **Criterios de aceptación:**
   - [ ] Interfaz `IUnitOfWork` con `SaveChangesAsync`, implementada por `MarinaDbContext` y registrada como `AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<MarinaDbContext>())`.
   - [ ] `GenericRepository` sin llamadas a `SaveChangesAsync`; `Add`/`Update`/`Remove` pasan a ser síncronos o solo marcan cambios.
@@ -117,7 +117,7 @@
 ### #160 — Sustituir `FluentValidation.AspNetCore` y añadir validadores
 
 - **Tipo:** Deuda técnica · **Puntos:** 3
-- **Problema:** [MarinaApi.csproj](MarinaApi/MarinaApi.csproj) referencia `FluentValidation.AspNetCore`, un paquete que su autor ha dejado de mantener y desaconseja. Además **no hay ningún validador** en el proyecto: la validación de entrada depende solo de las Data Annotations de las entidades, que no están en los DTOs.
+- **Problema:** `MarinaApi/MarinaApi.csproj` referencia `FluentValidation.AspNetCore`, un paquete que su autor ha dejado de mantener y desaconseja. Además **no hay ningún validador** en el proyecto: la validación de entrada depende solo de las Data Annotations de las entidades, que no están en los DTOs.
 - **Criterios de aceptación:**
   - [ ] Quitar `FluentValidation.AspNetCore`; añadir `FluentValidation` y `FluentValidation.DependencyInjectionExtensions`.
   - [ ] `AddValidatorsFromAssemblyContaining<Program>()` en `Program.cs`.
@@ -147,7 +147,7 @@
 ### #163 — Middleware de errores → `IExceptionHandler` + `ProblemDetails`
 
 - **Tipo:** Deuda técnica · **Puntos:** 3
-- **Problema:** [ExceptionHandlingMiddleware.cs](MarinaApi/Middleware/ExceptionHandlingMiddleware.cs) serializa a mano un objeto anónimo con formato *problem+json*. Los errores que genera el propio framework (400 de validación, 404 de rutas inexistentes, 405) salen con otro formato, no llevan `traceId`, y las cancelaciones del cliente (`OperationCanceledException`) se registran como 500.
+- **Problema:** `MarinaApi/Middleware/ExceptionHandlingMiddleware.cs` serializa a mano un objeto anónimo con formato *problem+json*. Los errores que genera el propio framework (400 de validación, 404 de rutas inexistentes, 405) salen con otro formato, no llevan `traceId`, y las cancelaciones del cliente (`OperationCanceledException`) se registran como 500.
 - **Criterios de aceptación:**
   - [ ] `IExceptionHandler` que traduce `NotFoundException` → 404, `ConflictException` → 409, cancelación del cliente → 499 sin `LogError`, y el resto → 500 con mensaje genérico.
   - [ ] `AddProblemDetails` con `traceId` en `Extensions`; `app.UseExceptionHandler()`.
@@ -203,7 +203,7 @@
 ### #168 — CORS restringido por configuración
 
 - **Tipo:** Producción · **Puntos:** 1
-- **Problema:** [Program.cs](MarinaApi/Program.cs) usa `AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()`.
+- **Problema:** `MarinaApi/Program.cs` usa `AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()`.
 - **Criterios de aceptación:**
   - [ ] Orígenes permitidos leídos de `Cors:Origenes` en configuración.
   - [ ] `AllowAnyOrigin` solo en `Development`.
@@ -223,10 +223,10 @@
 
 - **Tipo:** Chore · **Puntos:** 1
 - **Problema:**
-  - En [MarinaDbContext.cs](MarinaApi/Data/MarinaDbContext.cs), el bloque de la relación Barco ↔ Tripulante está sin indentar.
+  - En `MarinaApi/Data/MarinaDbContext.cs`, el bloque de la relación Barco ↔ Tripulante está sin indentar.
   - La configuración de Organizador ↔ Regata repite el mismo comentario en cada línea encadenada.
   - En `Barco.cs`, el comentario de `Tripulantes` habla de "skip navigations" y de "tabla intermedia", pero es una relación 1:N con FK normal.
-  - La última línea de [BarcoRepository.cs](MarinaApi/Repositories/BarcoRepository.cs) está sin indentar.
+  - La última línea de `MarinaApi/Repositories/BarcoRepository.cs` está sin indentar.
 - **Criterios de aceptación:**
   - [ ] `dotnet format` ejecutado sobre la solución.
   - [ ] Comentarios corregidos para que describan lo que hace el código.

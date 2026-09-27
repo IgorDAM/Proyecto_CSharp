@@ -6,7 +6,7 @@
 # Índice
 
 1. [[#Introducción]]
-2. [[#Lección 1: Sintaxis básica para quien viene de Java|Lección 1: Sintaxis C#]]
+2. [[#Lección 1: Sintaxis básica para quien viene de Java|Lección 1: Sintaxis CSharp]]
 3. [[#Lección 2: Colecciones y LINQ]]
 4. [[#Lección 3: Async/Await y manejo de excepciones|Lección 3: Async/Await]]
 5. [[#Mini-proyecto: Gestor de Biblioteca]]
@@ -77,7 +77,7 @@ public class Main {
 }
 ```
 
-### C# (estilo clásico)
+### CSharp (estilo clásico)
 ```csharp
 using System;
 
@@ -93,7 +93,7 @@ namespace MiApp
 }
 ```
 
-### C# moderno (top-level statements, .NET 6+)
+### CSharp moderno (top-level statements, .NET 6+)
 ```csharp
 Console.WriteLine("Hola mundo");
 ```
@@ -2201,7 +2201,7 @@ SELECT @NuevoId;
 
 ---
 
-## 7.9 SQL desde C#: ADO.NET, Dapper y EF Core
+## 7.9 SQL desde CSharp: ADO.NET, Dapper y EF Core
 
 EF Core (Lección 8) cubre la mayoría de los casos, pero en proyectos reales convive con SQL escrito a mano: consultas de informes muy optimizadas, procedimientos almacenados heredados, operaciones masivas. En .NET hay tres niveles.
 
@@ -4147,7 +4147,7 @@ public class AmarreService : IAmarreService
 
 ### Cuándo necesitas más que `SaveChangesAsync`
 
-El `IUnitOfWork` anterior cubre el 90% de los casos. Para el resto —varias llamadas a `SaveChanges` que deben ir juntas, o mezclar EF con SQL directo— se añade la transacción explícita de la [[#8.8 Transacciones explícitas|Lección 8.8]]:
+El `IUnitOfWork` anterior cubre el 90% de los casos. Para el resto —varias llamadas a `SaveChanges` que deben ir juntas, o mezclar EF con SQL directo— se añade la transacción explícita de la Lección 8.8:
 
 ```csharp
 public interface IUnitOfWork
@@ -5168,7 +5168,7 @@ Lo que se revisa antes de que una API pase a producción, con dónde se trata ca
 | **Dependencias externas** | `IHttpClientFactory` + timeouts + reintentos solo en métodos idempotentes | 13.4 |
 | **Jobs** | Scope por ejecución; qué pasa con N instancias | 13.5 |
 | **Logs** | Logging estructurado, sin datos sensibles, nivel adecuado por entorno | [[#Lección 15: Logging y Configuración en .NET\|Lección 15]] |
-| **Secretos** | Nada en `appsettings.json`; Azure Key Vault / AWS Secrets Manager | [[#Lección 15: Logging y Configuración en .NET\|Lección 15]] |
+| **Secretos** | Nada en `appsettings.json`; Azure Key Vault / AWS Secrets Manager | Lección 15 |
 | **Tests** | Tests unitarios de dominio y servicios; al menos un test de integración que arranque la app | [[#Lección 14: Testing con xUnit y Moq\|Lección 14]] |
 
 Y cinco puntos más que no tienen sección propia pero se preguntan siempre:
@@ -6435,7 +6435,7 @@ const nombres: Array<string> = ["Ana", "Luis"];
 
 ---
 
-## 19.3 Interfaces (paralelo directo con C#)
+## 19.3 Interfaces (paralelo directo con CSharp)
 
 ```typescript
 interface IRepositorio<T> {

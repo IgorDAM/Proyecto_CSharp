@@ -1,4 +1,4 @@
-# Marina API — Puerto a C# / ASP.NET Core
+# Marina API — Puerto a CSharp / ASP.NET Core
 
 Conversión completa a C#/.NET 8 del proyecto Java (Hibernate → Spring Boot →
 API REST) de gestión marítima y regatas. Mismo dominio (Barco, Amarre, Regata),

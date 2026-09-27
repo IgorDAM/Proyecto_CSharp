@@ -394,7 +394,7 @@ public DateOnly Fecha { get; set; }  // Solo fecha, sin hora — no hace falta a
 private Date fecha;
 ```
 
-## 3.6. `@Enumerated` → `enum` de C#
+## 3.6. `@Enumerated` → `enum` de CSharp
 
 Si tuvieras un campo de tipo fijo (Java Cap. 4.4.2):
 
@@ -492,7 +492,7 @@ dotnet ef migrations add AnadirTripulante
 dotnet ef database update
 ```
 
-### Comparación de Anotaciones Java vs C# (Resumen)
+### Comparación de Anotaciones Java vs CSharp (Resumen)
 
 | Función | Java JPA | C# EF Core |
 |---|---|---|
@@ -751,7 +751,7 @@ dotnet ef migrations add AnadirOrganizador
 dotnet ef database update
 ```
 
-### Comparación: Configuración de Relaciones (Java vs C#)
+### Comparación: Configuración de Relaciones (Java vs CSharp)
 
 | Aspecto | Java (Cap. 5) | C# (EF Core) |
 |---|---|---|
@@ -1033,7 +1033,7 @@ public async Task<List<Barco>> FindByCapacidadGreaterThanAsync(int capacidad, Ca
 | `FindByIdWithRegatasAsync(id)` | `SELECT b FROM Barco b JOIN FETCH b.regatas WHERE b.id = :id` |
 | `FindSinAmarreAsync()` | `SELECT b FROM Barco b WHERE b.amarre IS NULL` |
 
-### Comparación: DAO Java vs GenericRepository C#
+### Comparación: DAO Java vs GenericRepository CSharp
 
 **Java (Cap. 7.2.1) — Triplicación:**
 ```java
@@ -1434,7 +1434,7 @@ Esto es la misma motivación que ya conocías de Mockito en Java (Cap. 9): el DA
 
 ### 8.5.2. Cómo se usa Moq en este proyecto — ejemplo real, línea a línea
 
-Todo el testing de Moq del proyecto vive en un único fichero: [`MarinaApi.Tests/BarcoServiceTests.cs`](MarinaApi.Tests/BarcoServiceTests.cs). Vamos a diseccionar el constructor y dos tests.
+Todo el testing de Moq del proyecto vive en un único fichero: `MarinaApi.Tests/BarcoServiceTests.cs`. Vamos a diseccionar el constructor y dos tests.
 
 **El constructor — crear el mock e "inyectarlo" a mano:**
 
@@ -1617,7 +1617,7 @@ public async Task UpdateAsync_CuandoNoExiste_LanzaNotFoundException()
 }
 ```
 
-### Comparación Java vs C#
+### Comparación Java vs CSharp
 
 | Concepto | Java (Mockito) | C# (Moq) |
 |---|---|---|
@@ -1634,7 +1634,7 @@ public async Task UpdateAsync_CuandoNoExiste_LanzaNotFoundException()
 
 [[#Índice|↑ Volver al índice]]
 
-## 9.1. El "gran cambio" de Java, aplicado también en C#
+## 9.1. El "gran cambio" de Java, aplicado también en CSharp
 
 Tu Cap. 10-11 mostraban cómo Spring Boot reducía drásticamente el código de acceso a datos. En C#, ASP.NET Core + EF Core llega aún más lejos gracias a los repositorios genéricos: no hay clase equivalente a `BarcoDAOImpl` en absoluto — solo interfaces pequeñas con las consultas específicas.
 
@@ -1763,7 +1763,7 @@ public class BarcosController : ControllerBase
 
 [[#Índice|↑ Volver al índice]]
 
-## 10.1. `@Service` → clase C# + registro explícito
+## 10.1. `@Service` → clase CSharp + registro explícito
 
 ```java
 @Service
@@ -1831,7 +1831,7 @@ public async Task<BarcoDto> FindByIdAsync(long id, CancellationToken ct = defaul
 
 > **TIP:** fíjate en la diferencia de filosofía: Java devolvía `null` y dejaba que el Controller comprobara `if (barco != null)` (Cap. 13.3). En C#, el Servicio **lanza una excepción de dominio** (`NotFoundException`) que un middleware global convierte en 404 — nadie más en la aplicación necesita comprobar null manualmente. Ver Capítulo 11 de esta guía.
 
-## 10.4. AOP — `@Transactional`/`@Autowired` en Java vs Middleware en C#
+## 10.4. AOP — `@Transactional`/`@Autowired` en Java vs Middleware en CSharp
 
 Tu Cap. 12.8 explicaba que `@Transactional` y `@Autowired` funcionan gracias a **AOP** (aspectos que se ejecutan automáticamente alrededor de tus métodos). En C#, el concepto equivalente son los **Middlewares** de ASP.NET Core (ver Capítulo 11) — cada petición HTTP pasa por una cadena de middlewares antes de llegar al Controller, cada uno pudiendo interceptar, modificar o cortocircuitar la petición.
 

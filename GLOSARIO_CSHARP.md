@@ -1,4 +1,4 @@
-# Glosario C# / .NET — Marina API
+# Glosario CSharp / .NET — Marina API
 
 Documento vivo: cada vez que pregunto por una palabra o un trozo de código que no domino, se archiva aquí bajo el tema que le corresponda. No se reescribe, solo se amplía (igual que `GUIA_DEFINITIVA_CSHARP_1.md` y `MIGRACION_JAVA_A_CSHARP.md`).
 
@@ -19,18 +19,18 @@ Documento vivo: cada vez que pregunto por una palabra o un trozo de código que 
 
 ## Índice de temas
 
-- [Sintaxis C#](#sintaxis-c)
-- [.NET / ASP.NET Core](#net--aspnet-core)
-- [Entity Framework Core](#entity-framework-core)
-- [LINQ](#linq)
-- [SQL Server](#sql-server)
-- [Testing (xUnit / Moq)](#testing-xunit--moq)
-- [Git / Azure DevOps](#git--azure-devops)
-- [Scrum / Metodología](#scrum--metodología)
+- [[#Sintaxis CSharp]]
+- [[#.NET / ASP.NET Core]]
+- [[#Entity Framework Core]]
+- [[#LINQ]]
+- [[#SQL Server]]
+- [[#Testing (xUnit / Moq)]]
+- [[#Git / Azure DevOps]]
+- [[#Scrum / Metodología]]
 
 ---
 
-## Sintaxis C#
+## Sintaxis CSharp
 
 ### Expression-bodied member
 
