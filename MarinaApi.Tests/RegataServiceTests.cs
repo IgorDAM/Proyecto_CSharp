@@ -15,16 +15,13 @@ public class RegataServiceTests
 {
     private readonly Mock<IRegataRepository> _regataRepositoryMock;
     private readonly Mock<IBarcoRepository> _barcoRepositoryMock;
-    private readonly Mock<ITripulanteRepository> _tripulanteRepositoryMock;
     private readonly MarinaDbContext _context;
     private readonly RegataService _service;
-
     public RegataServiceTests()
     {
         _regataRepositoryMock = new Mock<IRegataRepository>();
         _barcoRepositoryMock = new Mock<IBarcoRepository>();
-        _tripulanteRepositoryMock = new Mock<ITripulanteRepository>();
-
+        
         var options = new DbContextOptionsBuilder<MarinaDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
@@ -33,11 +30,9 @@ public class RegataServiceTests
         _service = new RegataService(
             _regataRepositoryMock.Object,
             _barcoRepositoryMock.Object,
-            _tripulanteRepositoryMock.Object,
             _context
            );
     }
-
 
     [Fact]
     public async Task FindAllAsync_DevuelveLasRegatasDelRepositorio()
@@ -129,25 +124,11 @@ public class RegataServiceTests
     }
 
     [Fact]
-    public async Task ContarTripulantesTotalesAsync_SumaLosTripulantesDeTodosLosBarcos()
+    public async Task ContarTripulantesTotalesAsync_DevuelveElTotalDelRepositorio()
     {
         // Arrange
-        var barco1 = new Barco { Id = 1, Nombre = "Test" };
-        var barco2 = new Barco { Id = 2, Nombre = "Estrella del Sur" };
-        var regata = new Regata
-        {
-            Id = 1,
-            Nombre = "Regata de Prueba",
-            Lugar = "Gijón",
-            Barcos = new List<Barco> { barco1, barco2 }
-        };
-
-        _regataRepositoryMock.Setup(r => r.FindByIdWithBarcosAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(regata);
-        _tripulanteRepositoryMock.Setup(t => t.FindByBarcoIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Tripulante> { new() { Id = 1, Nombre = "Marcos", Rol = "Segundo", BarcoId = 1 } });
-        _tripulanteRepositoryMock.Setup(t => t.FindByBarcoIdAsync(2, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new List<Tripulante> { new() { Id = 2, Nombre = "Laura", Rol = "Timonel", BarcoId = 2 } });
+        _regataRepositoryMock.Setup(r => r.ContarTripulantesAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
 
         // Act
         var total = await _service.ContarTripulantesTotalesAsync(1);
@@ -160,15 +141,12 @@ public class RegataServiceTests
     public async Task ContarTripulantesTotalesAsync_CuandoRegataNoExiste_LanzaNotFoundException()
     {
         // Arrange
-        _regataRepositoryMock.Setup(r => r.FindByIdWithBarcosAsync(999, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((Regata?)null);
+        _regataRepositoryMock.Setup(r => r.ContarTripulantesAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((int?)null);
 
         // Act + Assert
         await FluentActions.Awaiting(() => _service.ContarTripulantesTotalesAsync(999))
             .Should().ThrowAsync<NotFoundException>();
-
-        // No debería llegar a consultar tripulantes de ningún barco
-        _tripulanteRepositoryMock.Verify(t => t.FindByBarcoIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
