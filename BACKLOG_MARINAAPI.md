@@ -236,6 +236,7 @@
 
 - **Tipo:** Feature · **Puntos:** 3
 - **Contexto:** MarinaApi solo se puede usar desde Swagger. Se añade un frontend mínimo con el mismo stack que SEIDEL indica en su porfolio para su plataforma web de gestión de eventos deportivos (.NET + REST API + MySQL, con HTML/CSS, JavaScript y Bootstrap en el front).
+- **Objetivo de aprendizaje:** el frontend es el medio; el fin es entender cómo se conecta con el backend y qué aporta cada capa (Middleware, Controller, DTO, Service, Repository, DbContext). Se documenta en `ARQUITECTURA_CAPAS.md` ([[Arquitectura por capas]] en el vault).
 - **Decisión:** las páginas viven en `MarinaApi/wwwroot/` y las sirve la propia API, en el mismo origen. No hace falta CORS, así que no condiciona al #168.
 - **Criterios de aceptación:**
   - [ ] `Program.cs` sirve `wwwroot` (`UseDefaultFiles` + `UseStaticFiles`).
@@ -244,4 +245,5 @@
   - [ ] Listado de Regatas (`GET /api/regatas`), mostrando `totalBarcosInscritos`.
   - [ ] Listado de Tripulantes (`GET /api/tripulantes`).
   - [ ] Mensaje visible si la API falla o la lista viene vacía.
+  - [ ] `ARQUITECTURA_CAPAS.md` con el recorrido completo de una petición y al menos un experimento por capa.
 - **Fuera de alcance:** crear, editar y borrar desde el frontend (ticket aparte si se quiere más adelante).
