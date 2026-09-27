@@ -8,24 +8,41 @@ Relacionado: [[Guía definitiva de CSharp#Lección 11: Arquitectura de backend e
 
 ## 1. El recorrido de una petición
 
-Lo que ocurre cuando `regatas.html` ejecuta `obtenerDatos("/api/regatas")`:
+Lo que ocurre cuando `regatas.html` ejecuta `obtenerDatos("/api/regatas")`, desde el `fetch` del navegador hasta MySQL **y de vuelta**:
 
-```
-Navegador      js/comun.js → fetch("/api/regatas")                ─┐ frontend
-───────────────────── HTTP GET /api/regatas ───────────────────────┘
-Program.cs     pipeline de middlewares, en el orden en que se registran
-  │  ExceptionHandlingMiddleware      try { await _next(context) } catch → problem+json
-  │  UseStaticFiles                   ¿existe wwwroot/api/regatas? No → sigue
-  │  MapControllers                   [Route("api/[controller]")] + [HttpGet] → RegatasController.GetAll
-Controller     RegatasController.GetAll(ct)          → Ok(await _regataService.FindAllAsync(ct))
-Service        RegataService.FindAllAsync(ct)        → _regataRepository.FindAllConContadorAsync(ct)
-Repository     RegataRepository.FindAllConContadorAsync
-                 _context.Regatas.Select(RegataMapper.ToDtoProjection).ToListAsync(ct)
-DbContext      EF Core traduce el LINQ a SQL (Pomelo, dialecto MySQL)
-MySQL          SELECT r.Id, r.Nombre, ..., (SELECT COUNT(*) FROM ... ) FROM Regatas r
+```mermaid
+sequenceDiagram
+    autonumber
+    participant N as 🌐 Navegador<br/>js/comun.js
+    participant EX as ExceptionHandling<br/>Middleware
+    participant SF as UseStaticFiles
+    participant C as RegatasController
+    participant S as RegataService
+    participant R as RegataRepository
+    participant EF as EF Core<br/>(Pomelo)
+    participant DB as 🐬 MySQL
+
+    N->>EX: HTTP GET /api/regatas
+    rect rgba(120,120,255,0.08)
+    Note over EX,C: Pipeline de middlewares (orden de registro en Program.cs)
+    EX->>SF: await _next(context)
+    SF->>SF: ¿existe wwwroot/api/regatas? No → sigue
+    SF->>C: MapControllers → GetAll(ct)
+    end
+    C->>S: FindAllAsync(ct)
+    S->>R: FindAllConContadorAsync(ct)
+    R->>EF: Regatas.Select(RegataMapper.ToDtoProjection).ToListAsync(ct)
+    EF->>DB: SELECT r.Id, r.Nombre, …, (SELECT COUNT(*) …) FROM Regatas r
+    DB-->>EF: filas
+    EF-->>R: lista de RegataDto
+    R-->>S: lista de RegataDto
+    S-->>C: lista de RegataDto
+    C-->>EX: Ok(lista) → 200
+    Note over C,EX: System.Text.Json serializa en camelCase
+    EX-->>N: 200 OK · application/json
 ```
 
-Y de vuelta: filas → `List<RegataDto>` → `Ok(...)` (200) → `System.Text.Json` serializa en **camelCase** (`TotalBarcosInscritos` → `totalBarcosInscritos`) → `respuesta.json()` → filas de la tabla.
+Para no cargar el diagrama se omiten otros middlewares del pipeline (`UseDefaultFiles`, `UseCors`, `UseHttpsRedirection`, `UseAuthorization`). La respuesta vuelve a atravesarlos en **orden inverso**, y `System.Text.Json` convierte los nombres a camelCase (`TotalBarcosInscritos` → `totalBarcosInscritos`), que es lo que lee `respuesta.json()`.
 
 **En Java/Spring** el recorrido es el mismo con otros nombres: filtros del servlet → `DispatcherServlet` → `@RestController` → `@Service` → `JpaRepository` → Hibernate → base de datos, y Jackson para el JSON.
 
