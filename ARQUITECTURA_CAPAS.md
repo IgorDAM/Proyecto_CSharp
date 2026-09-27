@@ -11,7 +11,7 @@ Relacionado: [[Guía definitiva de CSharp#Lección 11: Arquitectura de backend e
 Lo que ocurre cuando `regatas.html` ejecuta `obtenerDatos("/api/regatas")`, desde el `fetch` del navegador hasta MySQL **y de vuelta**:
 
 ```mermaid
-%%{init: {"sequence": {"mirrorActors": false, "actorMargin": 12, "width": 100, "height": 36, "boxMargin": 4, "noteMargin": 4, "messageMargin": 20, "bottomMarginAdj": 0}}}%%
+%%{init: {"themeVariables": {"fontSize": "11px"}, "sequence": {"mirrorActors": false, "actorFontSize": 11, "messageFontSize": 11, "noteFontSize": 11, "actorMargin": 8, "width": 80, "height": 28, "boxMargin": 3, "boxTextMargin": 2, "noteMargin": 3, "messageMargin": 14, "bottomMarginAdj": 0, "diagramMarginX": 10, "diagramMarginY": 4}}}%%
 sequenceDiagram
     autonumber
     participant N as 🌐 Navegador
