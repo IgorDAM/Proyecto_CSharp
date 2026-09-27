@@ -11,3 +11,6 @@ obj/
 
 # Archivos con contraseñas/secretos (no se comparten)
 contrasenas.txt
+
+# Archivos de paquetes y dependencias
+*.zip
