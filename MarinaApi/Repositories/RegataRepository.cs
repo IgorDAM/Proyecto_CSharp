@@ -15,6 +15,7 @@ public interface IRegataRepository : IGenericRepository<Regata>
     Task<Regata?> FindByIdWithBarcosAsync(long id, CancellationToken ct = default);
     Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default);
     Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default);
+    Task<int?> ContarTripulantesAsync(long regataId, CancellationToken ct = default);
 }
 
 public class RegataRepository : GenericRepository<Regata>, IRegataRepository
@@ -39,13 +40,19 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
         await _context.Regatas.Include(r => r.Barcos).FirstOrDefaultAsync(r => r.Id == id, ct);
 
     public async Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default) =>
-await _context.Regatas
-    .Select(RegataMapper.ToDtoProjection)
-    .ToListAsync(ct);
+        await _context.Regatas
+            .Select(RegataMapper.ToDtoProjection)
+            .ToListAsync(ct);
 
     public async Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default) =>
         await _context.Regatas
             .Where(r => r.Lugar == lugar)
             .Select(RegataMapper.ToDtoProjection)
             .ToListAsync(ct);
+
+    public async Task<int?> ContarTripulantesAsync(long regataId, CancellationToken ct = default) =>
+        await _context.Regatas
+            .Where(r => r.Id == regataId)
+            .Select(r => (int?)r.Barcos.Sum(b => b.Tripulantes.Count))
+            .FirstOrDefaultAsync(ct);
 }

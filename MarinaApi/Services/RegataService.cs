@@ -24,21 +24,17 @@ public class RegataService : IRegataService
 {
     private readonly IRegataRepository _regataRepository;
     private readonly IBarcoRepository _barcoRepository;
-    private readonly ITripulanteRepository _tripulanteRepository;
     private readonly MarinaDbContext _context;
 
-
-    public RegataService(IRegataRepository regataRepository, IBarcoRepository barcoRepository, ITripulanteRepository tripulanteRepository, MarinaDbContext context)
+    public RegataService(IRegataRepository regataRepository, IBarcoRepository barcoRepository, MarinaDbContext context)
     {
         _regataRepository = regataRepository;
         _barcoRepository = barcoRepository;
-        _tripulanteRepository = tripulanteRepository;
         _context = context;
-
     }
 
     public async Task<List<RegataDto>> FindAllAsync(CancellationToken ct = default) =>
-     await _regataRepository.FindAllConContadorAsync(ct);
+        await _regataRepository.FindAllConContadorAsync(ct);
 
     public async Task<RegataDto> FindByIdAsync(long id, CancellationToken ct = default)
     {
@@ -88,24 +84,16 @@ public class RegataService : IRegataService
 
     /// <summary>
     /// Suma los tripulantes de todos los barcos inscritos en una regata.
-    /// Cruza las dos relaciones: la N:M Regata↔Barco (vía FindByIdWithBarcosAsync)
-    /// y la 1:N Barco↔Tripulante (vía FindByBarcoIdAsync, una consulta por barco).
+    /// Lo calcula la base de datos en una sola consulta (proyección con SUM/COUNT
+    /// vía ContarTripulantesAsync), en vez de una consulta por barco (N+1).
     /// No se guarda un contador aparte: siempre se calcula al vuelo, así que si
     /// un barco se desinscribe o se le añade un tripulante, el total ya sale
     /// actualizado en la siguiente consulta sin tocar nada más.
     /// </summary>
     public async Task<int> ContarTripulantesTotalesAsync(long regataId, CancellationToken ct = default)
     {
-        var regata = await _regataRepository.FindByIdWithBarcosAsync(regataId, ct)
-            ?? throw new NotFoundException(nameof(Models.Regata), regataId);
-
-        var totalTripulantes = 0;
-        foreach (var barco in regata.Barcos)
-        {
-            var tripulantes = await _tripulanteRepository.FindByBarcoIdAsync(barco.Id, ct);
-            totalTripulantes += tripulantes.Count;
-        }
-        return totalTripulantes;
+        var total = await _regataRepository.ContarTripulantesAsync(regataId, ct);
+        return total ?? throw new NotFoundException(nameof(Models.Regata), regataId);
     }
 
     /// <summary>
