@@ -152,6 +152,49 @@ Task<List<Tripulante>> FindByBarcoIdAsync(long barcoId, CancellationToken ct = d
 
 ---
 
+### virtual / override
+
+**Qué es:** en C# un método solo se puede sobrescribir en una clase hija si la clase base lo marca como `virtual`. La hija lo sustituye con `override`, que es **obligatorio**. Si la base no es `virtual`, el `override` no compila (CS0506).
+
+**Equivalente en Java:** es justo al revés. En Java todo método de instancia es sobrescribible salvo que sea `final`, y `@Override` es una anotación opcional que solo sirve para que el compilador compruebe que de verdad sobrescribes algo. En C# la base tiene que dar permiso (`virtual`) y la hija tiene que declararlo (`override`).
+
+**Ejemplo real (ticket 152, 2026-09-24):**
+```csharp
+// MarinaApi/Repositories/GenericRepository.cs: la base da permiso
+public virtual async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
+    await _dbSet.ToListAsync(ct);
+
+// MarinaApi/Repositories/RegataRepository.cs: la hija lo sustituye
+public override async Task<List<Regata>> FindAllAsync(CancellationToken ct = default) =>
+    await _context.Regatas.Include(r => r.Barcos).ToListAsync(ct);
+```
+
+**Nota del proyecto:** este `override` se revirtió en el commit `6711ea2`, cuando el listado pasó a usar una proyección a DTO (ver Proyección a DTO con Select, en Entity Framework Core). Hoy `FindAllAsync` ya no es `virtual`. El concepto también importa para Moq: solo puede interceptar miembros `virtual` o de interfaz, y por eso en los tests se mockean interfaces (`IRegataRepository`) y no clases. Más detalle en [[Guía definitiva de CSharp#Herencia de clases]].
+
+---
+
+### Tipos anulables y throw expression
+
+**Qué es:** añadir `?` a un tipo de valor (`int`, `long`, `bool`...) lo convierte en anulable: `int?` puede valer un número o `null`. El operador `??` devuelve lo de la izquierda si no es `null` y, si lo es, lo de la derecha. A la derecha de `??` puede ir un `throw` (*throw expression*): C# permite usar `throw` dentro de una expresión, como si fuera un valor.
+
+**Equivalente en Java:** `int?` es como pasar de `int` a `Integer`. `valor ?? throw new X()` es como `optional.orElseThrow(() -> new X())`.
+
+**Ejemplo real (arreglo del N+1, `MarinaApi/Services/RegataService.cs`):**
+```csharp
+var total = await _regataRepository.ContarTripulantesAsync(regataId, ct); // int?
+return total ?? throw new NotFoundException(nameof(Models.Regata), regataId);
+```
+
+**Por qué `int?` y no `int`:** hay dos casos que un `int` no podría distinguir:
+- `0` significa que la regata existe pero no tiene tripulantes.
+- `null` significa que la regata no existe, y eso acaba en un 404.
+
+Con un `int`, los dos casos darían `0`. Al salir por `??`, el compilador sabe que ya no puede ser `null` y convierte el resultado en `int` él solo.
+
+**Truco relacionado:** en Moq, `ReturnsAsync(null)` a secas es ambiguo porque encaja en varias sobrecargas. Hay que escribir `ReturnsAsync((int?)null)`, igual que en Java a veces hay que poner `thenReturn((Integer) null)`.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
@@ -288,13 +331,104 @@ El `= default` en la firma significa "si no me pasas token, usa `CancellationTok
 
 ## Entity Framework Core
 
-_(pendiente de primeras entradas)_
+### Proyección a DTO con Select
+
+**Qué es:** pedirle a EF Core directamente el DTO (o un único valor calculado) en lugar de entidades. EF traduce la expresión del `Select` a SQL y solo trae las columnas y los cálculos que pides: no carga relaciones en memoria ni las rastrea (*change tracking*). Resuelve a la vez el N+1, el exceso de columnas y el coste del tracking.
+
+**Equivalente en Java:** la proyección de JPQL con constructor (`SELECT new com.marina.RegataDto(r.id, ..., SIZE(r.barcos)) FROM Regata r`) o las *interface projections* de Spring Data.
+
+**Ejemplo real 1: DTO completo (`MarinaApi/Mapping/RegataMapper.cs`, fix de `totalBarcosInscritos`):**
+```csharp
+public static readonly Expression<Func<Regata, RegataDto>> ToDtoProjection =
+    r => new RegataDto(
+        r.Id, r.Nombre, r.Lugar, r.Fecha,
+        r.Distancia, r.Barcos.Count);   // → COUNT(*) en una subconsulta SQL
+
+// MarinaApi/Repositories/RegataRepository.cs
+await _context.Regatas
+    .Select(RegataMapper.ToDtoProjection)
+    .ToListAsync(ct);
+```
+
+**Ejemplo real 2: un único valor (`RegataRepository.ContarTripulantesAsync`, arreglo del N+1):**
+```csharp
+await _context.Regatas
+    .Where(r => r.Id == regataId)
+    .Select(r => (int?)r.Barcos.Sum(b => b.Tripulantes.Count))
+    .FirstOrDefaultAsync(ct);
+```
+SQL que genera Pomelo contra MySQL (sacado del log de `dotnet run`):
+```sql
+SELECT (
+    SELECT COALESCE(SUM((
+        SELECT COUNT(*)
+        FROM `Tripulantes` AS `t`
+        WHERE `b0`.`Id` = `t`.`BarcoId`)), 0)
+    FROM `BarcoRegata` AS `b`
+    INNER JOIN `Barcos` AS `b0` ON `b`.`BarcosId` = `b0`.`Id`
+    WHERE `r`.`Id` = `b`.`RegatasId`)
+FROM `Regatas` AS `r`
+WHERE `r`.`Id` = @__regataId_0
+LIMIT 1
+```
+
+**Detalles que se ven en ese SQL:**
+- `COALESCE(SUM(...), 0)`: en SQL, `SUM` sobre cero filas devuelve `NULL`, pero en C# `Sum()` de una colección vacía devuelve `0`. EF añade el `COALESCE` para que SQL se comporte como C#. Por eso una regata sin barcos da `0` y no un 404.
+- `LIMIT 1` sale de `FirstOrDefaultAsync`. Si la regata no existe, no hay fila, y el cast `(int?)` convierte ese "sin fila" en `null`.
+- `@__regataId_0` es un parámetro, no el número pegado en el texto: protege de inyección SQL, igual que un `PreparedStatement` de JDBC.
+
+La proyección tiene que declararse como `Expression<Func<...>>` para que EF pueda traducirla (ver Func frente a Expression, en LINQ). Más contexto en [[Guía definitiva de CSharp#8.7 Change tracking, AsNoTracking y el problema N+1]] y en [[Migración de Java a CSharp#7.5. Agregaciones y proyecciones]].
+
+---
+
+### Problema N+1
+
+**Qué es:** un problema de rendimiento en el que se lanza **1** consulta para traer una lista y luego **N** consultas más, una por cada elemento, al acceder a una relación dentro de un bucle. El resultado es correcto, así que no se nota en los tests: solo se ve contando las consultas en el log.
+
+**Equivalente en Java:** el mismo problema de Hibernate con una colección `LAZY` recorrida en un bucle. Se arreglaba con `JOIN FETCH` o con una proyección JPQL.
+
+**Ejemplo real (antes del arreglo, `RegataService.ContarTripulantesTotalesAsync`):**
+```csharp
+var regata = await _regataRepository.FindByIdWithBarcosAsync(regataId, ct); // 1 consulta
+var totalTripulantes = 0;
+foreach (var barco in regata.Barcos)
+{
+    var tripulantes = await _tripulanteRepository.FindByBarcoIdAsync(barco.Id, ct); // +1 por barco
+    totalTripulantes += tripulantes.Count;
+}
+```
+Con 20 barcos salían 21 consultas. Después del arreglo (PR #6), sale **1** siempre, tenga los barcos que tenga (ver el ejemplo 2 de la entrada anterior).
+
+**Cómo detectarlo:** en la consola de `dotnet run`, cada consulta aparece como un bloque `Executed DbCommand`. Si una sola petición HTTP dispara muchos bloques casi iguales, es un N+1.
+
+**Cómo arreglarlo:**
+- **`Include`**, cuando necesitas los objetos relacionados enteros: los trae en la misma consulta.
+- **Proyección con `Select`**, cuando solo necesitas unos datos o un cálculo (un total, un contador). Es la opción preferible.
 
 ---
 
 ## LINQ
 
-_(pendiente de primeras entradas)_
+### Func frente a Expression
+
+**Qué es:** la misma lambda se puede guardar de dos formas:
+- `Func<Regata, RegataDto>` es **código compilado**: solo se puede ejecutar, en memoria.
+- `Expression<Func<Regata, RegataDto>>` es un **árbol de expresión**: la lambda guardada como datos, que otra librería puede leer y traducir. EF Core la traduce a SQL, y Moq la lee para saber qué llamada estás configurando en un `Setup`.
+
+**Equivalente en Java:** no hay un equivalente directo en el lenguaje. Lo más parecido es la diferencia entre un `Predicate<T>` normal (código que se ejecuta) y construir la consulta como objetos con Criteria API o QueryDSL (datos que Hibernate traduce a SQL).
+
+**Ejemplo real (`MarinaApi/Mapping/RegataMapper.cs`):**
+```csharp
+// ✅ Expression: EF Core la traduce a SQL (COUNT(*) incluido)
+public static readonly Expression<Func<Regata, RegataDto>> ToDtoProjection =
+    r => new RegataDto(r.Id, r.Nombre, r.Lugar, r.Fecha, r.Distancia, r.Barcos.Count);
+
+// ❌ Si fuera Func<Regata, RegataDto>, .Select() elegiría la versión de IEnumerable:
+// EF traería todas las regatas a memoria SIN sus barcos, y r.Barcos.Count daría 0,
+// que es el mismo síntoma que tenía el bug de totalBarcosInscritos.
+```
+
+**Regla práctica:** todo lo que pases a `Where`, `Select`, `OrderBy`... sobre un `IQueryable` (un `DbSet` de EF) tiene que ser una lambda escrita en el sitio o un `Expression<Func<>>`. Si lo guardas en una variable para reutilizarlo, decláralo como `Expression`. Más detalle en [[Guía definitiva de CSharp#5.2 Func, Action y Predicate — predefinidos]].
 
 ---
 
@@ -348,6 +482,45 @@ public async Task FindByIdAsync_CuandoNoExiste_LanzaNotFoundException()
 ```
 
 **Equivalente en Java:** el mismo patrón AAA se usa igual con JUnit + Mockito (`when(...).thenReturn(...)` para Arrange, la llamada para Act, `assertEquals`/`assertThrows` para Assert). No es una diferencia de lenguaje sino una convención universal de testing — solo cambia la sintaxis de las librerías (`Mock.Setup` vs `Mockito.when`, FluentAssertions `Should().Be()` vs `assertEquals` de JUnit).
+
+---
+
+### Setup, ReturnsAsync, It.IsAny y Verify (Moq)
+
+**Qué es:** las cuatro piezas básicas para usar un mock de Moq. Un `Mock<IRegataRepository>` implementa la interfaz, pero sus métodos no hacen nada: si llamas a uno sin configurar, devuelve el valor por defecto de su tipo (`null`, `0`, `false`...).
+- **`Setup(r => ...)`** describe qué llamada vas a configurar. Moq no ejecuta la lambda: la lee como `Expression` (ver Func frente a Expression, en LINQ).
+- **`ReturnsAsync(valor)`** fija lo que devuelve esa llamada, ya envuelto en un `Task` terminado. Es un atajo de `.Returns(Task.FromResult(valor))`.
+- **`It.IsAny<T>()`** acepta cualquier valor en ese argumento.
+- **`Verify(r => ..., Times.X)`** comprueba **después** del Act si se llamó a un método y cuántas veces.
+
+**Equivalente en Java (Mockito):**
+
+| Moq | Mockito |
+|---|---|
+| `mock.Setup(r => r.Metodo(1, It.IsAny<CancellationToken>()))` | `when(mock.metodo(eq(1L), any()))` |
+| `.ReturnsAsync(2)` | `.thenReturn(2)` |
+| `It.IsAny<T>()` | `any(T.class)` |
+| `mock.Verify(r => r.Metodo(...), Times.Never)` | `verify(mock, never()).metodo(...)` |
+| `mock.Object` (el objeto falso que se inyecta) | el propio `mock` |
+
+La diferencia de estilo: en Mockito llamas al método "de verdad" dentro de `when(...)`; en Moq lo describes con una lambda.
+
+**Ejemplo real (`MarinaApi.Tests/RegataServiceTests.cs`, tras el arreglo del N+1):**
+```csharp
+// Caso feliz
+_regataRepositoryMock.Setup(r => r.ContarTripulantesAsync(1, It.IsAny<CancellationToken>()))
+    .ReturnsAsync(2);
+
+// Regata inexistente: (int?)null para que ReturnsAsync no sea ambiguo
+_regataRepositoryMock.Setup(r => r.ContarTripulantesAsync(999, It.IsAny<CancellationToken>()))
+    .ReturnsAsync((int?)null);
+```
+
+**Lecciones del proyecto:**
+- Cuando el Service deja de llamar a un método, los `Setup` antiguos siguen compilando, pero ya no configuran nada. El test fallará o, peor, probará algo que ya no existe. Hay que actualizarlos a la vez que el código.
+- Un `Verify(..., Times.Never)` sobre un método al que el Service ya no llama nunca pasa siempre. Un test que no puede fallar no aporta nada: se borra.
+
+Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 
 ---
 
