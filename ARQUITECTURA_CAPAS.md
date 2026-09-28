@@ -110,7 +110,7 @@ Cada experimento hace visible una capa desde el frontend. Formato: qué se hizo,
 | # | Experimento | Capa | Resultado |
 |---|---|---|---|
 | 1 | Cambiar la URL del `fetch` a `/api/barcosXX` | Middleware / enrutado | Aviso rojo "La API respondió 404": `fetch` no lanza error con un 404; hay que comprobar `respuesta.ok`. Ninguna ruta coincide, así que ni se llega al Controller. |
-| 2 | Pestaña Network (F12): petición y respuesta crudas | Controller / DTO | *Pendiente* |
+| 2 | Pestaña Network (F12) al cargar `tripulantes.html` | Controller / DTO | 8 peticiones y tres "proveedores": el CDN (Bootstrap), `UseStaticFiles` (HTML y JS, que nunca llegan a un Controller) y el Controller (`/api/tripulantes`). La de la API trae `Content-Type: application/json; charset=utf-8` y solo cuatro claves en camelCase (`id`, `nombre`, `rol`, `barcoId`): el DTO decide qué sale y la navegación `Barco` de la entidad no aparece. Al recargar, los estáticos dan 304 (caché) y la API siempre 200 (sus datos pueden cambiar); con "Disable cache" todo es 200. |
 | 3 | Log de SQL en la consola de la API al cargar Regatas | Repository / EF Core | *Pendiente* |
 | 4 | `GET /api/regatas/9999` frente a `/api/regatasXX` | Service + Middleware | *Pendiente* |
 | 5 | Tripulantes: mostrar el nombre del barco (dos `fetch` o cambiar el DTO) | DTO / responsabilidad de cada capa | *Pendiente* |
