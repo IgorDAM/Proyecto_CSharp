@@ -6,11 +6,13 @@ namespace MarinaApi.Mapping;
 /// <summary>
 /// Equivalente a TripulanteMapper.java. Mismo patrón que BarcoMapper/AmarreMapper:
 /// extension methods en vez de una clase con métodos estáticos.
+/// BarcoNombre usa "?." porque la navegación Barco solo viene rellena si
+// el Repository la cargó (Include o proyección). Sin cargarla, llega null.
 /// </summary>
 public static class TripulanteMapper
 {
     public static TripulanteDto ToDto(this Tripulante tripulante) =>
-        new(tripulante.Id, tripulante.Nombre, tripulante.Rol, tripulante.BarcoId);
+        new(tripulante.Id, tripulante.Nombre, tripulante.Rol, tripulante.BarcoId, tripulante.Barco?.Nombre);
 
     // Crea una entidad NUEVA (sin Id) a partir del request. BarcoId viaja
     // directamente porque, a diferencia de Amarre, un Tripulante siempre

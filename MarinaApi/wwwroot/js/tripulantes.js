@@ -16,7 +16,7 @@ async function cargarTripulantes() {
                 <td>${tripulante.id}</td>
                 <td>${tripulante.nombre}</td>
                 <td>${tripulante.rol}</td>
-                <td>${tripulante.barcoId}</td>
+                <td>${tripulante.barcoNombre ?? `Barco #${tripulante.barcoId}`}</td>
                 `;
             tbody.appendChild(fila);
         }

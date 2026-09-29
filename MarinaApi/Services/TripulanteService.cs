@@ -28,7 +28,7 @@ public class TripulanteService : ITripulanteService
     }
 
     public async Task<List<TripulanteDto>> FindAllAsync(CancellationToken ct = default) =>
-        (await _tripulanteRepository.FindAllAsync(ct)).Select(t => t.ToDto()).ToList();
+        (await _tripulanteRepository.FindAllWithBarcoAsync(ct)).Select(t => t.ToDto()).ToList();
 
     public async Task<TripulanteDto> FindByIdAsync(long id, CancellationToken ct = default)
     {

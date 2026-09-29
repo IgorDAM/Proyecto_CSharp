@@ -157,16 +157,17 @@ public class TripulanteServiceTests
         _tripulanteRepositoryMock.Verify(r => r.DeleteAsync(tripulante, It.IsAny<CancellationToken>()), Times.Once);
     }
 
-    [Fact]
+       [Fact]
     public async Task FindAllAsync_MapeaTodasLasEntidadesADto()
     {
         // Arrange
+        var barco = new Barco { Id = 1, Nombre = "Aurora" };
         var tripulantes = new List<Tripulante>
         {
-            new() { Id = 1, Nombre = "Marcos", Rol = "Patrón", BarcoId = 1 },
-            new() { Id = 2, Nombre = "Laura", Rol = "Marinero", BarcoId = 1 }
+            new() { Id = 1, Nombre = "Marcos", Rol = "Patrón", BarcoId = 1, Barco = barco },
+            new() { Id = 2, Nombre = "Laura", Rol = "Marinero", BarcoId = 1, Barco = barco }
         };
-        _tripulanteRepositoryMock.Setup(r => r.FindAllAsync(It.IsAny<CancellationToken>()))
+        _tripulanteRepositoryMock.Setup(r => r.FindAllWithBarcoAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(tripulantes);
 
         // Act
@@ -175,6 +176,7 @@ public class TripulanteServiceTests
         // Assert
         resultado.Should().HaveCount(2);
         resultado.Select(t => t.Nombre).Should().Contain(new[] { "Marcos", "Laura" });
+        resultado.Should().OnlyContain(t => t.BarcoNombre == "Aurora");
     }
 
     [Fact]
