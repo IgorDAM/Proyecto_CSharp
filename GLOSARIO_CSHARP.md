@@ -195,6 +195,40 @@ Con un `int`, los dos casos darían `0`. Al salir por `??`, el compilador sabe q
 
 ---
 
+### Operador null-condicional ?.
+
+**Qué es:** `a?.B` devuelve `a.B` si `a` no es `null`, y `null` si lo es, en vez de lanzar una `NullReferenceException`. Se suele combinar con `??` para dar un valor por defecto: `a?.B ?? "sin dato"`.
+
+**Equivalente en Java:** `a != null ? a.getB() : null`, o `Optional.ofNullable(a).map(A::getB).orElse(null)`.
+
+**Ejemplo real (#171, experimento 5, `MarinaApi/Mapping/TripulanteMapper.cs`):**
+```csharp
+public static TripulanteDto ToDto(this Tripulante tripulante) =>
+    new(tripulante.Id, tripulante.Nombre, tripulante.Rol, tripulante.BarcoId,
+        tripulante.Barco?.Nombre);
+```
+
+**Por qué hace falta aquí:** la navegación está declarada `public Barco? Barco` y solo viene rellena si el Repository la cargó (`Include` o proyección). Sin el `?`, el compilador avisa con CS8602 ("posible desreferencia de una referencia nula") y, en ejecución, explotaría.
+
+**En JavaScript** existen los mismos dos operadores con el mismo significado: `?.` y `??`.
+
+---
+
+### Record posicional: anulable no es opcional
+
+**Qué es:** en un `record` posicional todos los parámetros son obligatorios. Declarar uno como `string?` significa que **admite `null`**, no que se pueda omitir. Para que fuera opcional haría falta un valor por defecto (`string? BarcoNombre = null`).
+
+**Equivalente en Java:** igual que en un `record` de Java o en un constructor: añadir un componente rompe todos los `new` que no lo pasen.
+
+**Ejemplo real (#171, experimento 5):** al añadir `string? BarcoNombre` a `TripulanteDto`, `dotnet build` falló en el Mapper:
+```
+error CS7036: No se ha dado ningún argumento que corresponda al parámetro
+requerido "BarcoNombre" de "TripulanteDto.TripulanteDto(long, string, string, long, string?)"
+```
+El error es útil: el compilador señala todas las capas que construyen el DTO.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
@@ -329,6 +363,54 @@ El `= default` en la firma significa "si no me pasas token, usa `CancellationTok
 
 ---
 
+### UseDefaultFiles, UseStaticFiles y el orden de los middlewares
+
+**Qué es:** `UseStaticFiles()` sirve los archivos de `wwwroot` (HTML, JS, CSS) sin pasar por ningún Controller. `UseDefaultFiles()` reescribe `/` a `/index.html`. Los middlewares se ejecutan **en el orden en que se registran** en `Program.cs`, así que `UseDefaultFiles` tiene que ir antes que `UseStaticFiles`: primero se reescribe la ruta y después se sirve el archivo. Si no existe un archivo con esa ruta, `UseStaticFiles` pasa la petición al siguiente middleware.
+
+**Equivalente en Java:** la carpeta `src/main/resources/static/` de Spring Boot, que se sirve sola; el orden de los middlewares es como el orden de los `Filter` de la cadena de Servlets.
+
+**Ejemplo real (#171, `MarinaApi/Program.cs`):**
+```csharp
+app.UseDefaultFiles();   // "/" → "/index.html"
+app.UseStaticFiles();    // sirve el archivo de wwwroot
+```
+
+---
+
+### JSON en camelCase
+
+**Qué es:** `System.Text.Json`, el serializador de ASP.NET Core, convierte por defecto las propiedades PascalCase de C# a camelCase en el JSON. El DTO tiene `BarcoNombre` y el frontend recibe `barcoNombre`.
+
+**Equivalente en Java:** Jackson ya usa camelCase porque en Java los getters (`getBarcoNombre`) se traducen así; en C# es una conversión explícita del serializador.
+
+**Ejemplo real (#171):** en JavaScript hay que escribir `tripulante.barcoNombre`. Si escribes mal el nombre (`regata.barcosInscritos` en vez de `totalBarcosInscritos`), JS no avisa: devuelve `undefined`.
+
+---
+
+### Restricciones de ruta ({id:long})
+
+**Qué es:** `[HttpGet("{id:long}")]` solo casa si el segmento se puede convertir a `long`. Si no, la ruta **no existe** para esa petición: se responde 404 sin llegar al Controller.
+
+**Equivalente en Java:** en Spring, `@GetMapping("/{id}")` con `Long id` sí entra en el mapping y falla al convertir: da un **400** (`MethodArgumentTypeMismatchException`). Sin la restricción `:long`, .NET también llegaría al Controller y el model binding daría un 400.
+
+**Ejemplo real (#171, experimento 4):** `GET /api/regatas/abc` → 404 con el cuerpo vacío, igual que una URL que no existe (`/api/regatasXX`).
+
+---
+
+### ProblemDetails y application/problem+json
+
+**Qué es:** formato estándar de respuestas de error (RFC 9457, antes RFC 7807): un JSON con `type`, `title`, `status` y `detail`, enviado con `Content-Type: application/problem+json`. Así el cliente sabe que es un error sin tener que interpretar el cuerpo.
+
+**Equivalente en Java:** la clase `ProblemDetail` de Spring 6, devuelta desde un `@ControllerAdvice` con `@ExceptionHandler`.
+
+**Ejemplo real (#171, experimento 4, `MarinaApi/Middleware/ExceptionHandlingMiddleware.cs`):** `GET /api/regatas/9999` → el Service lanza `NotFoundException`, el middleware la captura y responde:
+```json
+{"type":"https://httpstatuses.com/404","title":"NotFound","status":404,"detail":"Regata con Id 9999 no encontrado."}
+```
+Un 404 de ruta inexistente, en cambio, llega con el cuerpo vacío: en el frontend no todo error trae JSON, así que hay que mirar `respuesta.ok` antes de hacer `respuesta.json()`.
+
+---
+
 ## Entity Framework Core
 
 ### Proyección a DTO con Select
@@ -404,6 +486,25 @@ Con 20 barcos salían 21 consultas. Después del arreglo (PR #6), sale **1** sie
 **Cómo arreglarlo:**
 - **`Include`**, cuando necesitas los objetos relacionados enteros: los trae en la misma consulta.
 - **Proyección con `Select`**, cuando solo necesitas unos datos o un cálculo (un total, un contador). Es la opción preferible.
+
+---
+
+### Include y la ausencia de lazy loading
+
+**Qué es:** EF Core solo carga lo que se le pide. Una navegación (`tripulante.Barco`) se queda en `null` salvo que la consulta la cargue con `.Include(t => t.Barco)` (un `JOIN` en la misma consulta) o con una proyección. No hay lazy loading salvo que se instale el paquete de proxies.
+
+**Equivalente en Java:** `Include` es el `JOIN FETCH` de JPQL. La diferencia está en el valor por defecto: en JPA, `@ManyToOne` es EAGER, así que Hibernate trae el objeto relacionado sin pedírselo (y a menudo provoca N+1).
+
+**Ejemplo real (#171, experimento 5, `MarinaApi/Repositories/TripulanteRepository.cs`):**
+```csharp
+public async Task<List<Tripulante>> FindAllWithBarcoAsync(CancellationToken ct = default) =>
+    await _context.Tripulantes
+        .Include(t => t.Barco)
+        .ToListAsync(ct);
+```
+Sin el `Include`, el JSON traía `barcoNombre: null`. Con él, el log muestra `INNER JOIN Barcos`.
+
+**Coste:** `Include` trae **todas** las columnas de la tabla relacionada (`Capacidad`, `Eslora`, `Manga`...) aunque solo se use una. Si solo hace falta un dato, es mejor una proyección (ver Proyección a DTO con Select, en Entity Framework Core).
 
 ---
 
