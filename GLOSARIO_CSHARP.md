@@ -329,6 +329,105 @@ El `= default` en la firma significa "si no me pasas token, usa `CancellationTok
 
 ---
 
+### User secrets
+
+**Qué es:** un almacén de configuración **fuera del repo**, por proyecto y por usuario, pensado para guardar contraseñas y claves en desarrollo. Vive en `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`, y el `<UserSecretsId>` se declara en el `.csproj`. En Development, `WebApplication.CreateBuilder()` lo carga automáticamente **encima** de `appsettings.json`: si la misma clave está en los dos sitios, gana user-secrets.
+
+**Equivalente en Java/Spring:** un `application-local.properties` metido en `.gitignore`, o variables de entorno. La diferencia es que aquí el archivo ni siquiera está dentro de la carpeta del proyecto, así que es imposible subirlo a git por error.
+
+**Ojo:** no cifra nada, solo saca el secreto del repo. En producción se usan variables de entorno o un almacén real (Azure Key Vault, AWS Secrets Manager).
+
+**Ejemplo (real del proyecto, corrección de seguridad del 2026-09-30):**
+```powershell
+# La cadena de conexión con contraseña ya no está en appsettings.json
+dotnet user-secrets set "ConnectionStrings:MarinaDb" "Server=localhost;Port=3306;Database=gestion_maritima;User=marina_app;Password=..." --project .\MarinaApi
+dotnet user-secrets list --project .\MarinaApi
+```
+```csharp
+// Program.cs — se lee igual que antes: la configuración ya mezcla las fuentes
+var connectionString = builder.Configuration.GetConnectionString("MarinaDb");
+```
+
+---
+
+### Autenticación JWT Bearer (AddJwtBearer y dotnet user-jwts)
+
+**Qué es:** el cliente manda en cada petición la cabecera `Authorization: Bearer <token>`, donde el token es un JWT firmado. `AddJwtBearer()` registra el *handler* que comprueba la firma, el emisor (`iss`), la audiencia (`aud`) y la caducidad. Si todo cuadra, rellena `HttpContext.User`; si no, la petición llega sin usuario y la autorización la rechaza con **401**.
+
+**Equivalente en Java/Spring:** Spring Security con `oauth2ResourceServer().jwt()` y `spring.security.oauth2.resourceserver.jwt.issuer-uri`.
+
+**`dotnet user-jwts`:** herramienta de desarrollo (.NET 7+) que emite tokens de prueba sin necesidad de un servidor de identidad. `dotnet user-jwts create` guarda la clave de firma en user-secrets, escribe el emisor y las audiencias válidas en `appsettings.Development.json` y muestra el token. Por eso `AddJwtBearer()` funciona **sin opciones**: lee todo de la sección `Authentication:Schemes:Bearer`.
+
+**Ejemplo (real del proyecto):**
+```csharp
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+// ...
+app.UseAuthentication();   // 1º: ¿quién eres? (lee el token)
+app.UseAuthorization();    // 2º: ¿puedes entrar?
+```
+```powershell
+dotnet user-jwts create --project .\MarinaApi --name igor   # genera un token nuevo
+dotnet user-jwts list   --project .\MarinaApi               # los ya emitidos
+```
+En Swagger: botón **Authorize**, se pega el token **sin** el prefijo `Bearer`.
+
+---
+
+### FallbackPolicy, [Authorize] y [AllowAnonymous]
+
+**Qué es:** `[Authorize]` exige un usuario autenticado en un controlador o en una acción concreta. La **FallbackPolicy** es la política que se aplica a todo endpoint que *no* tiene ningún atributo de autorización. Si se configura como "requiere usuario autenticado", la API queda **cerrada por defecto** y hay que abrir explícitamente con `[AllowAnonymous]` lo que deba ser público.
+
+**Equivalente en Java/Spring:** `.anyRequest().authenticated()` al final de la configuración de `HttpSecurity`, con `.requestMatchers(...).permitAll()` como equivalente de `[AllowAnonymous]`.
+
+**Por qué FallbackPolicy y no `[Authorize]` en cada controlador:** si mañana se crea un controlador nuevo y se olvida el atributo, con `[Authorize]` quedaría abierto; con la FallbackPolicy queda protegido. Un fallo de este tipo se corrige añadiendo `[AllowAnonymous]`, nunca dejando datos expuestos sin querer.
+
+**Lo que NO cubre:** Swagger (`UseSwagger`) y los archivos estáticos (`UseStaticFiles`) son middleware, no endpoints de controlador, así que la FallbackPolicy no les afecta.
+
+**Ejemplo (real del proyecto):**
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+```
+```csharp
+// Así se abriría un endpoint concreto (p.ej. para el frontend de #171)
+[AllowAnonymous]
+[HttpGet]
+public async Task<ActionResult<List<BarcoDto>>> GetAll(CancellationToken ct) => ...
+```
+
+---
+
+### CORS
+
+**Qué es:** *Cross-Origin Resource Sharing*. El **navegador** bloquea que una web de un origen (esquema + dominio + puerto) lea respuestas de otro origen, salvo que el servidor lo autorice con cabeceras `Access-Control-Allow-*`. Solo afecta a navegadores: Postman, `curl` o un backend no lo aplican. No sustituye a la autenticación; sirve para impedir que *otra web* use el navegador del usuario contra tu API.
+
+**Equivalente en Java/Spring:** `@CrossOrigin` o un `CorsConfigurationSource` con `setAllowedOrigins(...)`.
+
+**El error que tenía el proyecto:** `AllowAnyOrigin()` permitía que cualquier página abierta en el navegador llamara a la API en `localhost`, incluidos los `DELETE`. Ahora se usa una lista blanca configurable. Un frontend servido **desde la propia API** (`wwwroot`, rama #171) es el mismo origen, así que no necesita CORS.
+
+**Ejemplo (real del proyecto):**
+```csharp
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? Array.Empty<string>();
+
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(allowedOrigins)
+              .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+              .WithHeaders("Authorization", "Content-Type")));
+```
+```json
+// appsettings.json — vacío = ningún origen externo permitido
+"Cors": { "AllowedOrigins": [] }
+```
+
+---
+
 ## Entity Framework Core
 
 ### Proyección a DTO con Select
@@ -553,6 +652,20 @@ Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 **Ejemplo (real del proyecto):** rama `feature/crud-tripulante` con commits `wip: TripulanteRepository`, `wip: DTOs, Mapper y Service...`, `feat: TripulantesController...`, `test: TripulanteServiceTests...` → tras squash and merge, en `master` aparece un único commit: `feat: CRUD de Tripulante (#150)`.
 
 ---
+
+---
+
+### git branch -D tras un squash and merge
+
+**Qué es:** con *squash and merge*, GitHub crea en `master` un commit **nuevo** (otro hash) con todo el contenido de la rama. Git compara hashes, no contenido, así que no reconoce tu rama local como mergeada: `git branch -d` (minúscula) se niega a borrarla y hay que usar `-D` (mayúscula, forzado). No se pierde nada, porque el contenido ya está en `master`.
+
+**Ejemplo (PR #10, 2026-09-30):**
+```powershell
+git switch master
+git pull
+git branch -D fix/seguridad-secretos
+git push origin --delete fix/seguridad-secretos   # o el botón "Delete branch" del PR
+```
 
 ---
 
