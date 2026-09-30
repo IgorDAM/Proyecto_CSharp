@@ -14,10 +14,10 @@
 |---|---|---|---|---|---|---|
 | **#154** | Borrar un Barco elimina también su Amarre | Bug | 🔴 | 2 | — | ⬜ |
 | **#155** | Asignación concurrente de barco devuelve 500 en vez de 409 | Bug | 🔴 | 2 | — | ⬜ |
-| **#156** | Contraseña de SQL Server en `appsettings.json` y `docker-compose.yml` | Seguridad | 🔴 | 2 | — | ⬜ |
+| **#156** | Credenciales de MySQL versionadas en `appsettings.json` | Seguridad | 🔴 | 2 | #171 | ⬜ |
 | **#157** | `Precio` de Amarre como `double` en vez de `decimal` | Bug | 🔴 | 3 | — | ⬜ |
 | **#158** | Unit of Work: los repositorios no deben llamar a `SaveChangesAsync` | Deuda técnica | 🟠 | 5 | — | ⬜ |
-| **#159** | Completar y versionar los tests de `AssignBarcoAsync` | Tests | 🟠 | 2 | — | ⬜ |
+| **#159** | Completar y versionar los tests de `AssignBarcoAsync` | Tests | 🟠 | 2 | — | ✅ [PR #2] |
 | **#160** | Sustituir `FluentValidation.AspNetCore` y añadir validadores | Deuda técnica | 🟠 | 3 | — | ⬜ |
 | **#161** | Validar el contenedor de DI al arrancar + test | Calidad | 🟠 | 1 | — | ⬜ |
 | **#162** | Logging de SQL activo en todos los entornos | Configuración | 🟠 | 1 | #156 | ⬜ |
@@ -29,11 +29,12 @@
 | **#168** | CORS restringido por configuración | Producción | 🟢 | 1 | — | ⬜ |
 | **#169** | Versionado de la API (v1 explícita) | Producción | 🟢 | 3 | — | ⬜ |
 | **#170** | Formato y comentarios de `MarinaDbContext`, `BarcoRepository` y tests | Chore | 🟢 | 1 | — | ⬜ |
+| **#171** | `docker-compose.yml` levanta SQL Server en vez de MySQL | Bug | 🔴 | 2 | — | ⬜ |
 
-**Total: 40 puntos.** Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 42 puntos.** Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
-- **Sprint 1 (bugs y riesgos, 14 pts):** #154, #155, #156, #157, #159, #161, #162
+- **Sprint 1 (bugs y riesgos, 16 pts):** #154, #155, #156, #157, #159, #161, #162, #171
 - **Sprint 2 (deuda técnica, 13 pts):** #158, #160, #163, #164
 - **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168, #169, #170
 
@@ -55,25 +56,35 @@
 ### #155 — Asignación concurrente de barco devuelve 500 en vez de 409
 
 - **Tipo:** Bug · **Puntos:** 2
-- **Problema:** `AmarreService.AssignBarcoAsync` comprueba con `FindByBarcoIdAsync` que el barco no tiene ya amarre y después actualiza. Si llegan dos peticiones a la vez que asignan el mismo barco a dos amarres distintos, **las dos pasan la comprobación**. La base de datos lo impide gracias al índice único filtrado sobre `Amarres.BarcoId` (está en la migración inicial), pero la segunda petición lanza una `DbUpdateException` que el middleware convierte en un **500**, cuando debería ser un **409 Conflict**.
+- **Problema:** `AmarreService.AssignBarcoAsync` comprueba con `FindByBarcoIdAsync` que el barco no tiene ya amarre y después actualiza. Si llegan dos peticiones a la vez que asignan el mismo barco a dos amarres distintos, **las dos pasan la comprobación**. La base de datos lo impide gracias al índice único sobre `Amarres.BarcoId` (está en la migración inicial), pero la segunda petición lanza una `DbUpdateException` que el middleware convierte en un **500**, cuando debería ser un **409 Conflict**.
 - **Criterios de aceptación:**
-  - [ ] Capturar la `DbUpdateException` por violación de índice único (SQL Server: `SqlException.Number` 2601 o 2627) y traducirla a `ConflictException` (o al `Error.Conflicto` si #164 decide usar Result).
+  - [ ] Capturar la `DbUpdateException` por violación de índice único (con Pomelo/MySqlConnector: `MySqlException.Number == 1062`, "Duplicate entry" — ya no `SqlException` 2601/2627 de SQL Server) y traducirla a `ConflictException` (o al `Error.Conflicto` si #164 decide usar Result).
   - [ ] La traducción vive en Infrastructure (repositorio o Unit of Work), no en el controlador.
   - [ ] Test que simula la violación y comprueba el 409.
   - [ ] Opcional: evaluar añadir `RowVersion` a `Amarre` para detectar también ediciones concurrentes del mismo amarre.
 - **Guía:** Lección 8.8 (concurrencia optimista), Lección 12.4 (la unicidad la garantiza el índice, no el `if`).
 
-### #156 — Contraseña de SQL Server en `appsettings.json` y `docker-compose.yml`
+### #156 — Credenciales de MySQL versionadas en `appsettings.json`
 
-- **Tipo:** Seguridad · **Puntos:** 2
-- **Problema:** la cadena de conexión con `User Id=sa;Password=TuPassword123!` está en [appsettings.json](MarinaApi/appsettings.json) y la misma contraseña aparece en [docker-compose.yml](MarinaApi/docker-compose.yml). Las dos están versionadas en GitHub. Aunque sea una contraseña de desarrollo, es justo el hábito que un code review de empresa rechaza (error n.º 8 del resumen final de la guía).
+- **Tipo:** Seguridad · **Puntos:** 2 · **Depende de:** #171
+- **Problema (actualizado tras la migración a MySQL del 2026-09-22):** [appsettings.json](MarinaApi/appsettings.json) tiene la cadena de conexión a MySQL con usuario `root` y contraseña en claro, versionada en GitHub. Sigue siendo el mismo hábito que un code review de empresa rechaza (error n.º 8 del resumen final de la guía), solo que ahora la credencial expuesta es la de MySQL en vez de la de SQL Server.
 - **Criterios de aceptación:**
   - [ ] `appsettings.json` sin credenciales (la clave puede quedar con un valor vacío o un marcador).
   - [ ] Desarrollo: `dotnet user-secrets set "ConnectionStrings:MarinaDb" "..."`.
-  - [ ] `docker-compose.yml` lee la contraseña de un archivo `.env` incluido en `.gitignore`, con un `.env.example` versionado.
   - [ ] README actualizado con los pasos de arranque.
-  - [ ] Opcional: no usar el usuario `sa` para la aplicación.
+  - [ ] Opcional: no usar el usuario `root` para la aplicación.
 - **Guía:** Lección 15 (configuración y secretos).
+
+### #171 — `docker-compose.yml` levanta SQL Server en vez de MySQL
+
+- **Tipo:** Bug · **Puntos:** 2
+- **Problema:** [docker-compose.yml](MarinaApi/docker-compose.yml) no se migró junto con el resto del proyecto: sigue levantando `mcr.microsoft.com/mssql/server:2022-latest` (SQL Server 2022) con su propia contraseña (`MSSQL_SA_PASSWORD`), distinta de la que usa `appsettings.json` para MySQL. Quien clone el repo y siga el `docker-compose.yml` no consigue una base de datos que la aplicación pueda usar.
+- **Criterios de aceptación:**
+  - [ ] `docker-compose.yml` levanta un servicio MySQL 8 (imagen `mysql:8`).
+  - [ ] La base de datos creada se llama `gestion_maritima` y el servicio expone el puerto 3306.
+  - [ ] Desde un clon limpio del repo, `docker compose up` seguido de `dotnet ef database update` funciona sin pasos manuales adicionales.
+  - [ ] README actualizado con los pasos de arranque.
+- **Guía:** Lección 11.4 (proveedores de EF Core), sección 2.6 de `MIGRACION_JAVA_A_CSHARP.md`.
 
 ### #157 — `Precio` de Amarre como `double` en vez de `decimal`
 
@@ -101,16 +112,16 @@
   - [ ] Corregido el comentario engañoso de `GenericRepository`.
 - **Guía:** Lección 12.1.
 
-### #159 — Completar y versionar los tests de `AssignBarcoAsync`
+### #159 — Completar y versionar los tests de `AssignBarcoAsync` ✅ [PR #2](https://github.com/IgorDAM/Proyecto_CSharp/pull/2)
 
 - **Tipo:** Tests · **Puntos:** 2
-- **Problema:** `MarinaApi.Tests/AssignBarcoServiceTests.cs` **no está en el control de versiones** (aparece como no seguido en `git status`) y solo tiene el caso feliz. Los tres caminos de error del ticket #151 no tienen test.
+- **Problema (resuelto):** `MarinaApi.Tests/AssignBarcoServiceTests.cs` no estaba en el control de versiones y solo tenía el caso feliz. Los tres caminos de error del ticket #151 no tenían test.
 - **Criterios de aceptación:**
-  - [ ] Test: el amarre no existe → `NotFoundException`.
-  - [ ] Test: el barco no existe → `NotFoundException`.
-  - [ ] Test: el barco ya tiene otro amarre → `ConflictException`, y `UpdateAsync` no se llama (`Times.Never`).
-  - [ ] Corregida la indentación del primer `[Fact]`.
-  - [ ] Archivo añadido al repositorio en su propio commit.
+  - [x] Test: el amarre no existe → `NotFoundException`.
+  - [x] Test: el barco no existe → `NotFoundException`.
+  - [x] Test: el barco ya tiene otro amarre → `ConflictException`, y `UpdateAsync` no se llama (`Times.Never`).
+  - [x] Corregida la indentación del primer `[Fact]`.
+  - [x] Archivo añadido al repositorio en su propio commit.
 - **Guía:** Lección 14 (xUnit, Moq, `Verify`).
 
 ### #160 — Sustituir `FluentValidation.AspNetCore` y añadir validadores
@@ -226,6 +237,7 @@
   - La configuración de Organizador ↔ Regata repite el mismo comentario en cada línea encadenada.
   - En `Barco.cs`, el comentario de `Tripulantes` habla de "skip navigations" y de "tabla intermedia", pero es una relación 1:N con FK normal.
   - La última línea de [BarcoRepository.cs](MarinaApi/Repositories/BarcoRepository.cs) está sin indentar.
+  - En [AssignBarcoServiceTests.cs](MarinaApi.Tests/AssignBarcoServiceTests.cs), el 3º y el 4º `[Fact]` (líneas 63 y 84) tienen 8 espacios de indentación en vez de 4.
 - **Criterios de aceptación:**
   - [ ] `dotnet format` ejecutado sobre la solución.
   - [ ] Comentarios corregidos para que describan lo que hace el código.
