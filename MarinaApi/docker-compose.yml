@@ -1,14 +1,25 @@
+# Base de datos de desarrollo de MarinaApi (MySQL 8).
+#
+# La contraseña de root NO va en este archivo (se sube a GitHub): se lee de
+# la variable MYSQL_ROOT_PASSWORD del archivo .env, que está en .gitignore.
+# Copia .env.example a .env, rellénalo y ejecuta: docker compose up -d
+#
+# El puerto se publica solo en 127.0.0.1: MySQL es accesible desde este
+# equipo, pero no desde otros equipos de la red local.
+#
+# La API NO se conecta como root, sino con el usuario 'marina_app', que solo
+# tiene permisos sobre gestion_maritima (ver MIGRACION_JAVA_A_CSHARP.md, 2.6).
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: marina-sqlserver
+  mysql:
+    image: mysql:8.0
+    container_name: marina-mysql
     environment:
-      ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "TuPassword123!"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en el archivo .env}
+      MYSQL_DATABASE: gestion_maritima
     ports:
-      - "1433:1433"
+      - "127.0.0.1:3306:3306"
     volumes:
-      - marina-data:/var/opt/mssql
+      - marina-mysql-data:/var/lib/mysql
 
 volumes:
-  marina-data:
+  marina-mysql-data:

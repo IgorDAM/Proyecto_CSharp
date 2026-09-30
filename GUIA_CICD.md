@@ -273,16 +273,16 @@ levantar una base de datos junto al job con `services`:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
           ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: "TuPassword123!"
+          MSSQL_SA_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P TuPassword123! -Q 'SELECT 1'"
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P $MSSQL_SA_PASSWORD -Q 'SELECT 1'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
     env:
-      ConnectionStrings__Default: Server=localhost,1433;Database=marina_test;User Id=sa;Password=TuPassword123!;TrustServerCertificate=True
+      ConnectionStrings__Default: Server=localhost,1433;Database=marina_test;User Id=sa;Password=${{ secrets.CI_DB_PASSWORD }};TrustServerCertificate=True
     steps:
       # ...los mismos pasos de la sección 4...
 ```
