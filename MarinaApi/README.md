@@ -12,13 +12,15 @@ Stack de SEIDEL frente a este proyecto:
 | | Tutorial Java original | Este proyecto | SEIDEL |
 |---|---|---|---|
 | Lenguaje / framework | Java / Spring Boot | **C# / ASP.NET Core (.NET 8)** | .NET / C# |
-| Base de datos | MySQL | **SQL Server** | MySQL y PostgreSQL |
+| Base de datos | MySQL | **MySQL 8 (Pomelo)** | MySQL y PostgreSQL |
 | ORM | Hibernate | **Entity Framework Core** | — |
 | Integraciones | — | REST | Incluye sistemas legacy SOAP/XML |
 | Despliegue | — | Local (Docker) | Azure y AWS |
 
-El lenguaje y el framework coinciden con los de SEIDEL. La base de datos no:
-cambiar de SQL Server a MySQL o PostgreSQL se explica en la Lección 11.4 de la guía.
+El lenguaje, el framework y la base de datos coinciden con los de SEIDEL. El
+proyecto empezó con SQL Server y se migró a MySQL el 2026-09-22 (sección 2.6 de
+`MIGRACION_JAVA_A_CSHARP.md`); pasar a PostgreSQL se explica en la Lección 11.4
+de la guía.
 
 Sirve como práctica directa de varios bloques de `GUIA_DEFINITIVA_CSHARP_1.md`:
 - **Lección 6** (Patrones de Diseño: Repository, DI, Factory) → `Repositories/` y `Services/`
@@ -29,36 +31,52 @@ Sirve como práctica directa de varios bloques de `GUIA_DEFINITIVA_CSHARP_1.md`:
 
 ## Cómo ejecutar
 
-```bash
-# 1. Levantar SQL Server
+Ningún secreto vive en el repo: la contraseña de MySQL va en `.env` y la cadena
+de conexión de la API, en **user-secrets**. Todo se ejecuta desde la carpeta
+`MarinaApi/`.
+
+```powershell
+# 1. Levantar MySQL (solo la primera vez: copia la plantilla y pon una contraseña)
+Copy-Item .env.example .env        # edita MYSQL_ROOT_PASSWORD en .env
 docker compose up -d
 
-# 2. Restaurar dependencias y aplicar migraciones
-cd MarinaApi
-dotnet restore
+# 2. Crear el usuario de la aplicación (la API no se conecta como root)
+docker exec -it marina-mysql mysql -u root -p
+#   CREATE USER 'marina_app'@'%' IDENTIFIED BY '<CONTRASEÑA_APP>';
+#   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES
+#     ON gestion_maritima.* TO 'marina_app'@'%';
+#   exit
+
+# 3. Guardar la cadena de conexión en user-secrets (fuera del repo)
+dotnet user-secrets set "ConnectionStrings:MarinaDb" "Server=localhost;Port=3306;Database=gestion_maritima;User=marina_app;Password=<CONTRASEÑA_APP>;"
+
+# 4. Aplicar las migraciones
 dotnet tool install --global dotnet-ef   # solo la primera vez
-dotnet ef migrations add InitialCreate
 dotnet ef database update
 
-# 3. Arrancar la API
-dotnet run
+# 5. Generar un token JWT de desarrollo (todos los endpoints lo exigen)
+dotnet user-jwts create --name igor
+
+# 6. Arrancar la API
+dotnet run --launch-profile http
 ```
 
-Swagger UI queda disponible en `https://localhost:PORT/swagger` (equivalente
-a `http://localhost:8080/swagger-ui.html` en el proyecto Java).
+Swagger UI queda en `http://localhost:5000/swagger` (equivalente a
+`http://localhost:8080/swagger-ui.html` en el proyecto Java). Pulsa
+**Authorize** y pega el token del paso 5, sin el prefijo `Bearer`. Sin token,
+la API responde **401**.
 
-```bash
-# Ejecutar los tests
-cd ../MarinaApi.Tests
-dotnet test
+```powershell
+# Ejecutar los tests (desde la raíz del repo: no hay .sln)
+dotnet test MarinaApi.Tests
 ```
 
-> **Nota de conexión:** la cadena de conexión en `appsettings.json` usa el
-> usuario `sa` con la contraseña definida en `docker-compose.yml`
-> (`MSSQL_SA_PASSWORD`). Cámbiala en ambos sitios a la vez si la modificas.
-> Si en tus prácticas usas SQL Server con autenticación de Windows en vez de
-> `sa`/contraseña, cambia la cadena de conexión a
-> `Server=localhost;Database=gestion_maritima;Trusted_Connection=True;TrustServerCertificate=True;`.
+> **Notas:**
+> - Si `dotnet run` falla con `DirectoryNotFoundException ... wwwroot` después
+>   de cambiar de rama, ejecuta `dotnet clean`: `bin/` conserva archivos
+>   generados con la otra rama.
+> - CORS no admite ningún origen externo por defecto. Para un frontend en otro
+>   origen, añádelo a `Cors:AllowedOrigins` en `appsettings.json`.
 
 ## Estructura del proyecto
 
