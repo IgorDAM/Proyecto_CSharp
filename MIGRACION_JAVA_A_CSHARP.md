@@ -116,7 +116,7 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 // Ver archivo del proyecto: appsettings.json (actualizado 2026-09-22)
 {
   "ConnectionStrings": {
-    "MarinaDb": "Server=localhost;Port=3306;Database=gestion_maritima;User=root;Password=marinaMySQL123;"
+    "MarinaDb": "Server=localhost;Port=3306;Database=gestion_maritima;User=marina_app;Password=<TU_PASSWORD>;"
   }
 }
 ```
@@ -160,7 +160,7 @@ services:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "TuPassword123!"
+      MSSQL_SA_PASSWORD: "<TU_PASSWORD>"
     ports:
       - "1433:1433"
 ```
@@ -228,7 +228,7 @@ choco install azure-data-studio
 
 Opción B: **sqlcmd** (línea de comandos)
 ```powershell
-sqlcmd -S localhost,1433 -U sa -P TuPassword123! -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES;"
+sqlcmd -S localhost,1433 -U sa -P "<TU_PASSWORD>" -Q "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES;"
 ```
 
 **Deberías ver:**
@@ -294,7 +294,7 @@ options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
 **Docker en local:** en vez de un `docker-compose.yml`, para MySQL basta con:
 
 ```powershell
-docker run --name marina-mysql -e MYSQL_ROOT_PASSWORD=marinaMySQL123 -e MYSQL_DATABASE=gestion_maritima -p 3306:3306 -d mysql:8.0
+docker run --name marina-mysql -e MYSQL_ROOT_PASSWORD=<TU_PASSWORD> -e MYSQL_DATABASE=gestion_maritima -p 3306:3306 -d mysql:8.0
 ```
 
 - **Checkpoint:** cambiar de proveedor EF Core no es solo "cambiar una línea" — toca el paquete, la configuración, el código de arranque y obliga a regenerar el historial de migraciones. Pero el modelo, los repositorios, los servicios y los controllers no cambian ni una línea: esa es la promesa de EF Core (y de cualquier ORM) como capa de abstracción sobre el motor de base de datos concreto.
