@@ -30,7 +30,7 @@
 | **#169** | Versionado de la API (v1 explícita) | Producción | 🟢 | 3 | — | ⬜ |
 | **#170** | Formato y comentarios de `MarinaDbContext`, `BarcoRepository` y tests | Chore | 🟢 | 1 | — | ⬜ |
 | **#171** | `docker-compose.yml` levanta SQL Server en vez de MySQL | Bug | 🔴 | 2 | — | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
-| **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ✅ rama `fix/172-amarre-ocupado` |
+| **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ✅ [PR #11](https://github.com/IgorDAM/Proyecto_CSharp/pull/11) |
 | **#173** | El contenedor `marina-mysql` publica el 3306 en toda la red local | Seguridad | 🟠 | 1 | — | ⬜ |
 | **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ⬜ |
 | **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ⬜ |
@@ -92,7 +92,7 @@
   - [x] README actualizado con los pasos de arranque.
 - **Guía:** Lección 11.4 (proveedores de EF Core), sección 2.6 de `MIGRACION_JAVA_A_CSHARP.md`.
 
-### #172 — Asignar un barco a un amarre ocupado desaloja al barco anterior ✅
+### #172 — Asignar un barco a un amarre ocupado desaloja al barco anterior ✅ [PR #11](https://github.com/IgorDAM/Proyecto_CSharp/pull/11)
 
 - **Tipo:** Bug · **Puntos:** 2 · **Origen:** revisión de seguridad del 2026-09-30
 - **Problema:** `AmarreService.AssignBarcoAsync` comprueba que el **barco** no tenga ya otro amarre, pero no que el **amarre** esté libre. Si el amarre 5 tiene el barco A y se hace `PATCH /api/Amarres/5/barco` con el barco B, se sobrescribe `BarcoId` y A se queda sin amarre sin ningún aviso. Es un fallo de integridad: el índice único de `Amarres.BarcoId` no lo detecta, porque B no está en ningún otro amarre.
