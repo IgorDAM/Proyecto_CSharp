@@ -60,10 +60,32 @@ public class AmarreService : IAmarreService
     public async Task<List<AmarreDto>> FindConElectricidadAsync(CancellationToken ct = default) =>
         (await _amarreRepository.FindByElectricidadAsync(true, ct)).Select(a => a.ToDto()).ToList();
 
+    /// <summary>
+    /// Asigna un Barco existente a un Amarre (ticket #151). Reglas, en este orden:
+    /// <list type="number">
+    /// <item>El Amarre tiene que existir; si no, 404.</item>
+    /// <item>Si el Amarre ya tiene ESE mismo Barco, se devuelve sin tocar nada:
+    /// la operación es idempotente (#172).</item>
+    /// <item>Si el Amarre está ocupado por OTRO Barco, 409: no se desaloja a nadie (#172).</item>
+    /// <item>El Barco tiene que existir; si no, 404.</item>
+    /// <item>El Barco no puede tener ya otro Amarre; si no, 409.</item>
+    /// </list>
+    /// </summary>
     public async Task<AmarreDto> AssignBarcoAsync(long id, AsignarBarcoDto dto, CancellationToken ct = default)
     {
         var amarre = await _amarreRepository.FindByIdAsync(id, ct)
             ?? throw new NotFoundException(nameof(Models.Amarre), id);
+
+        // #172: repetir la misma asignación no es un error (idempotente):
+        // se devuelve el amarre tal cual, sin volver a guardar.
+        if (amarre.BarcoId == dto.BarcoId)
+            return amarre.ToDto();
+
+        // #172: pero meter un barco en un amarre ocupado por OTRO sí lo es:
+        // no se desaloja a nadie sin avisar.
+        if (amarre.BarcoId is not null)
+            throw new ConflictException(
+                $"El Amarre con Id {id} ya está ocupado por el Barco {amarre.BarcoId}.");
 
         var barcoExiste = await _barcoRepository.ExistsAsync(dto.BarcoId, ct);
         if (!barcoExiste)
