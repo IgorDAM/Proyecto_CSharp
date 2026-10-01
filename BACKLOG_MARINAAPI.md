@@ -30,7 +30,7 @@
 | **#169** | Versionado de la API (v1 explícita) | Producción | 🟢 | 3 | — | ⬜ |
 | **#170** | Formato y comentarios de `MarinaDbContext`, `BarcoRepository` y tests | Chore | 🟢 | 1 | — | ⬜ |
 | **#171** | `docker-compose.yml` levanta SQL Server en vez de MySQL | Bug | 🔴 | 2 | — | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
-| **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ⬜ |
+| **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ✅ rama `fix/172-amarre-ocupado` |
 | **#173** | El contenedor `marina-mysql` publica el 3306 en toda la red local | Seguridad | 🟠 | 1 | — | ⬜ |
 | **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ⬜ |
 | **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ⬜ |
@@ -92,15 +92,16 @@
   - [x] README actualizado con los pasos de arranque.
 - **Guía:** Lección 11.4 (proveedores de EF Core), sección 2.6 de `MIGRACION_JAVA_A_CSHARP.md`.
 
-### #172 — Asignar un barco a un amarre ocupado desaloja al barco anterior
+### #172 — Asignar un barco a un amarre ocupado desaloja al barco anterior ✅
 
 - **Tipo:** Bug · **Puntos:** 2 · **Origen:** revisión de seguridad del 2026-09-30
 - **Problema:** `AmarreService.AssignBarcoAsync` comprueba que el **barco** no tenga ya otro amarre, pero no que el **amarre** esté libre. Si el amarre 5 tiene el barco A y se hace `PATCH /api/Amarres/5/barco` con el barco B, se sobrescribe `BarcoId` y A se queda sin amarre sin ningún aviso. Es un fallo de integridad: el índice único de `Amarres.BarcoId` no lo detecta, porque B no está en ningún otro amarre.
 - **Criterios de aceptación:**
-  - [ ] Test primero en `AssignBarcoServiceTests`: el amarre ya tiene otro barco → `ConflictException`, y `UpdateAsync` no se llama (`Times.Never`).
-  - [ ] Comprobación en `AssignBarcoAsync` antes de las demás, que lanza `ConflictException` → 409.
-  - [ ] Decidido y cubierto por un test: si se reasigna **el mismo** barco que ya tiene el amarre, ¿409 o 200 idempotente?
-  - [ ] `/// <summary>` y comentarios de `AssignBarcoAsync` actualizados.
+  - [x] Test primero en `AssignBarcoServiceTests`: el amarre ya tiene otro barco → `ConflictException`, y `UpdateAsync` no se llama (`Times.Never`). Además comprueba que el barco anterior sigue en el amarre.
+  - [x] Comprobación en `AssignBarcoAsync` antes de las demás, que lanza `ConflictException` → 409.
+  - [x] Decidido: reasignar **el mismo** barco → **200 idempotente** (sin `UpdateAsync` y sin consultar el barco, con `Verify(..., Times.Never)`). La comprobación idempotente va antes que la de "ocupado"; un experimento moviéndola confirmó que el test lo detecta.
+  - [x] `/// <summary>` de `AssignBarcoAsync` con las cinco reglas en orden.
+- **Verificado en Swagger contra MySQL (2026-10-01):** asignación normal 200 → misma asignación 200 → otro barco 409 (`El Amarre con Id 1 ya está ocupado por el Barco 1.`) → el amarre conserva su barco. Tests 37/37.
 - **Guía:** Lección 12.2 (invariantes de dominio). Encaja después en #165 (`Amarre.AsignarBarco()`).
 
 ### #157 — `Precio` de Amarre como `double` en vez de `decimal`

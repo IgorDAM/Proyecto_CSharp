@@ -623,6 +623,136 @@ Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 
 ---
 
+### FluentAssertions: `.Should()`
+
+**Qué es:** la librería de asserts del proyecto (`FluentAssertions` 6.12 en `MarinaApi.Tests.csproj`). `Should()` es un *extension method* (ver Extension methods, en Sintaxis C#) que se "pega" a cualquier valor y devuelve un objeto con los asserts propios de su tipo. Se lee como una frase: *"resultado.BarcoId debería ser 5"*.
+
+**Equivalente en Java:** AssertJ, casi uno a uno: `assertThat(x).isEqualTo(5)` ↔ `x.Should().Be(5)`.
+
+| FluentAssertions | AssertJ | Para qué |
+|---|---|---|
+| `x.Should().Be(5)` | `assertThat(x).isEqualTo(5)` | igualdad |
+| `x.Should().BeNull()` / `NotBeNull()` | `isNull()` / `isNotNull()` | nulos |
+| `lista.Should().HaveCount(3)` | `hasSize(3)` | tamaño |
+| `lista.Should().BeEmpty()` | `isEmpty()` | vacía |
+| `lista.Should().OnlyContain(t => t.BarcoNombre == "Aurora")` | `allMatch(...)` | todos cumplen |
+| `dto.Should().BeEquivalentTo(esperado)` | `usingRecursiveComparison().isEqualTo(...)` | compara propiedad a propiedad |
+
+**Por qué se usa en vez de `Assert.Equal` de xUnit:** el mensaje de error dice qué expresión falló y con qué valor. `Assert.Equal(5, resultado.BarcoId)` falla con `Expected: 5, Actual: 7`; `resultado.BarcoId.Should().Be(5)` falla con `Expected resultado.BarcoId to be 5, but found 7`.
+
+**Ojo con la versión:** desde la v8 (enero de 2025), FluentAssertions es de pago para uso comercial. El proyecto usa la 6.12, que sigue siendo gratuita. En una empresa conviene preguntar qué versión o alternativa usan (por ejemplo, Shouldly, o los `Assert` de xUnit).
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):**
+```csharp
+resultado.BarcoId.Should().Be(5);
+amarre.BarcoId.Should().Be(7);   // #172: el barco que ya estaba no se ha tocado
+```
+
+---
+
+### `FluentActions.Awaiting(...)` y `.Should().ThrowAsync<T>()`
+
+**Qué es:** la forma de FluentAssertions de comprobar que un método **async** lanza una excepción. Se lee de dentro afuera:
+
+1. **`() => _service.AssignBarcoAsync(1, dto)`**: una lambda que *todavía no se ejecuta*. Es la "acción" que se quiere probar, envuelta para que el assert decida cuándo lanzarla y pueda capturar lo que salga.
+2. **`FluentActions.Awaiting(lambda)`**: marca esa acción como asíncrona (algo que hay que esperar con `await`). Para un método **síncrono**, el equivalente es `FluentActions.Invoking(() => ...)`.
+3. **`.Should().ThrowAsync<ConflictException>()`**: ejecuta la acción, la espera y comprueba que termina con esa excepción (o una clase hija; para el tipo exacto, `ThrowExactlyAsync<T>()`). Si no lanza nada, o lanza otra cosa, el test falla.
+4. **`await` delante de todo**: `ThrowAsync` devuelve un `Task`, y el assert ocurre *dentro* de ese `Task`.
+
+**Equivalente en Java:**
+```java
+// JUnit 5
+assertThrows(ConflictException.class, () -> service.assignBarco(1L, dto));
+// AssertJ
+assertThatThrownBy(() -> service.assignBarco(1L, dto)).isInstanceOf(ConflictException.class);
+```
+En Java no hace falta el `Awaiting` ni el `await` porque el método es síncrono. En C# el método devuelve un `Task`, y la excepción "viaja" dentro de él hasta que alguien lo espera.
+
+**⚠️ La trampa:** si se olvida el `await` del principio, el test **pasa siempre**, lance o no la excepción. El `Task` con el assert se crea, nadie lo espera, y el test termina antes de comprobar nada. Es un test que no puede fallar. El compilador avisa con el warning **CS4014**: no lo ignores.
+
+**Extras útiles:**
+```csharp
+// Comprobar también el mensaje (* = comodín)
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().ThrowAsync<ConflictException>()
+    .WithMessage("*ya tiene asignado*");
+
+// Comprobar que NO lanza nada
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().NotThrowAsync();
+```
+
+**Alternativa sin FluentAssertions (xUnit puro):** `await Assert.ThrowsAsync<ConflictException>(() => _service.AssignBarcoAsync(1, dto));`. Ojo: esta exige el tipo **exacto**, no acepta clases hijas.
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`, #172):**
+```csharp
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().ThrowAsync<ConflictException>();
+```
+
+---
+
+### `Times` en `Verify` (Moq)
+
+**Qué es:** el segundo argumento de `Verify` dice **cuántas veces** debía haberse llamado al método:
+
+| Moq | Mockito | Significado |
+|---|---|---|
+| `Times.Never` | `never()` | ninguna |
+| `Times.Once` | `times(1)` | exactamente una |
+| `Times.Exactly(3)` | `times(3)` | exactamente 3 |
+| `Times.AtLeastOnce` | `atLeastOnce()` | 1 o más |
+| `Times.AtMost(2)` | `atMost(2)` | 2 o menos |
+| `Times.Between(1, 3, Range.Inclusive)` | — | entre 1 y 3 |
+
+**⚠️ Diferencia con Mockito:** sin segundo argumento, `mock.Verify(r => r.UpdateAsync(...))` significa **al menos una vez** (`AtLeastOnce`), mientras que en Mockito `verify(mock).update(...)` significa **exactamente una** (`times(1)`). Para no depender de eso, en el proyecto se escribe siempre el `Times` explícito.
+
+**Para qué sirve `Times.Never`:** comprobar que un camino de error **corta antes** de hacer efectos. En el #172 no basta con que lance `ConflictException`: además, `UpdateAsync` no debe llamarse, para que no se guarde nada en la base de datos.
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):**
+```csharp
+_amarreRepositoryMock.Verify(r => r.UpdateAsync(amarre, It.IsAny<CancellationToken>()), Times.Once);    // caso feliz
+_amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);  // errores
+```
+
+---
+
+### `MockBehavior`: mock *loose* frente a *strict* (Moq)
+
+**Qué es:** cómo reacciona un mock cuando se llama a un método **sin `Setup`**:
+- **`Loose`** (por defecto, `new Mock<T>()`): no protesta; devuelve el valor por defecto del tipo (`null`, `0`, `false`). Si el método devuelve `Task<T>`, devuelve un `Task` ya terminado con `default(T)`, normalmente `null`.
+- **`Strict`** (`new Mock<T>(MockBehavior.Strict)`): cualquier llamada sin `Setup` lanza `MockException`. Obliga a configurar exactamente lo que el código va a usar.
+
+**Equivalente en Java (Mockito):** un mock de Mockito también es *loose* para las llamadas sin configurar: devuelve `null`, `0` o una colección vacía. La "strictness" de Mockito (`STRICT_STUBS`, por defecto con `MockitoExtension`) es otra cosa: avisa de los `when(...)` que **no se usaron**. No hay un equivalente directo a `MockBehavior.Strict`.
+
+**Por qué el proyecto usa `Loose`:**
+- En el test del #172 se configuran `ExistsAsync` y `FindByBarcoIdAsync` aunque el servicio corte antes de llamarlos. Con `Loose` no molestan, y el test no depende del orden de las comprobaciones.
+- Con `Strict` cada test se rompería al reordenar el código del servicio, aunque el comportamiento fuera el mismo (tests "frágiles").
+
+**La trampa de `Loose`:** un método que se olvidó configurar devuelve `null` en silencio, y el fallo aparece lejos de la causa (un `NullReferenceException` en el servicio, o un test que falla sin motivo aparente). Pasó en el #171 con `FindAllAsync_MapeaTodasLasEntidadesADto`: el servicio empezó a llamar a `FindAllWithBarcoAsync`, que no tenía `Setup`, y Moq devolvía `null`.
+
+---
+
+### Cast de `null` en `ReturnsAsync`: `(Amarre?)null`
+
+**Qué es:** `ReturnsAsync` tiene varias sobrecargas: una recibe el **valor** a devolver y otras reciben una **función** que lo calcula. Un `null` a secas encaja en todas, así que el compilador no sabe cuál elegir y da el error **CS0121** (*"The call is ambiguous between..."*). El cast le da un tipo concreto y elige la sobrecarga de "valor".
+
+**Equivalente en Java:** en Mockito `thenReturn(null)` funciona sin cast, porque no hay sobrecargas que compitan de la misma forma. El concepto es el mismo que cuando en Java se escribe `metodo((String) null)` para deshacer una ambigüedad entre `metodo(String)` y `metodo(Integer)`.
+
+**Formas equivalentes:**
+```csharp
+.ReturnsAsync((Amarre?)null);     // la que usa el proyecto
+.ReturnsAsync(default(Amarre));   // default de un tipo por referencia = null
+```
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):** "el barco no tiene ningún amarre todavía":
+```csharp
+_amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationToken>()))
+    .ReturnsAsync((Amarre?)null);
+```
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM

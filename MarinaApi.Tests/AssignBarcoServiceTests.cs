@@ -60,7 +60,7 @@ public class AssignBarcoServiceTests
         _barcoRepositoryMock.Verify(b => b.ExistsAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-        [Fact]
+    [Fact]
     public async Task AssignBarcoAsync_CuandoBarcoNoExiste_LanzaNotFoundException()
     {
         // Arrange
@@ -81,7 +81,7 @@ public class AssignBarcoServiceTests
         _amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
-        [Fact]
+    [Fact]
     public async Task AssignBarcoAsync_CuandoBarcoYaTieneAmarre_LanzaConflictException()
     {
         // Arrange
@@ -101,5 +101,57 @@ public class AssignBarcoServiceTests
             .Should().ThrowAsync<ConflictException>();
 
         _amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AssignBarcoAsync_CuandoAmarreOcupadoPorOtroBarco_LanzaConflictException()
+    {
+        // Arrange: el amarre 1 ya lo ocupa el barco 7 y se intenta meter el 5
+        var amarre = new Amarre { Id = 1, Ubicacion = "A-12", BarcoId = 7 };
+        var dto = new AsignarBarcoDto(5);
+
+        _amarreRepositoryMock.Setup(r => r.FindByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(amarre);
+        _barcoRepositoryMock.Setup(b => b.ExistsAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Amarre?)null);
+
+        // Act + Assert
+        await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+            .Should().ThrowAsync<ConflictException>();
+
+        // El barco 7 sigue en su amarre y no se guarda nada
+        amarre.BarcoId.Should().Be(7);
+        _amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AssignBarcoAsync_CuandoElMismoBarcoYaEstaEnEseAmarre_DevuelveDtoSinActualizar()
+    {
+        // Arrange: el barco 5 ya está en el amarre 1 y se vuelve a pedir lo mismo
+        var amarre = new Amarre { Id = 1, Ubicacion = "A-12", BarcoId = 5 };
+        var dto = new AsignarBarcoDto(5);
+
+        _amarreRepositoryMock.Setup(r => r.FindByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(amarre);
+        _barcoRepositoryMock.Setup(b => b.ExistsAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(amarre);
+
+        // Act
+        var resultado = await _service.AssignBarcoAsync(1, dto);
+
+        // Assert: misma respuesta que la primera vez...
+        resultado.Id.Should().Be(1);
+        resultado.BarcoId.Should().Be(5);
+
+        // ...sin volver a guardar...
+        _amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        // ...y sin consultar nada más: sale nada más ver que el barco ya está ahí
+        _barcoRepositoryMock.Verify(b => b.ExistsAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+        _amarreRepositoryMock.Verify(r => r.FindByBarcoIdAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
