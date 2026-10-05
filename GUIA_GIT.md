@@ -14,6 +14,7 @@ según el stack es el `.gitignore` (sección 8).
 6. Deshacer cosas
 7. Conflictos
 8. .gitignore para .NET
+9. Trampas del día a día en Windows
 
 ---
 
@@ -331,3 +332,23 @@ commit posterior **no basta**: sigue en el historial. Hay que rotar esa
 credencial (cambiarla). En desarrollo local, .NET tiene `dotnet user-secrets`
 para no meter secretos en `appsettings.json`; en CI/producción se usan
 variables de entorno (ver `GUIA_CICD.md`).
+
+---
+
+## 9. Trampas del día a día en Windows
+
+### `.git/index.lock` huérfano
+
+**Síntoma:** `fatal: Unable to create '.../.git/index.lock': File exists.`
+
+**Causa:** git crea `index.lock` mientras modifica el índice y lo borra al terminar. Si un proceso de git se corta a medias, o dos herramientas lanzan git a la vez (el IDE, una terminal, Claude...), el archivo se queda y bloquea todos los comandos siguientes. En este repo ha pasado dos veces con un simple `git status`, que también puede escribir en el índice para refrescar su caché.
+
+**Solución:** comprobar que no hay ningún git en marcha y borrar `.git/index.lock`. Para consultas que no deben tocar nada, `git --no-optional-locks status` no toma el bloqueo (es lo que usa VS Code por dentro, y lo que usa Claude en este repo).
+
+### Las rutas son relativas a la carpeta actual
+
+`git add MarinaApi/Program.cs` lanzado **desde dentro** de `MarinaApi\` falla con *pathspec did not match*, porque git busca `MarinaApi\MarinaApi\Program.cs`. Los comandos con rutas se lanzan desde la raíz `Marina_C#` (o con `git -C <raíz> ...`). `git rev-parse --show-toplevel` dice cuál es la raíz.
+
+### PowerShell no se detiene si falla un comando encadenado
+
+Con `git switch master; git pull; git switch -c rama`, si `git pull` falla, PowerShell sigue y crea la rama a partir de un `master` sin actualizar. El `;` no mira si el anterior falló. En PowerShell 7 se puede usar `&&` (solo sigue si el anterior acabó bien), como en bash. En Windows PowerShell 5.1 no existe: hay que lanzar los comandos de uno en uno o comprobar `$LASTEXITCODE`.

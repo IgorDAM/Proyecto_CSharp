@@ -26,6 +26,7 @@ Documento vivo: cada vez que pregunto por una palabra o un trozo de código que 
 - [SQL Server](#sql-server)
 - [Testing (xUnit / Moq)](#testing-xunit--moq)
 - [Git / Azure DevOps](#git--azure-devops)
+- [Errores frecuentes (compilación y entorno)](#errores-frecuentes-compilación-y-entorno)
 - [Scrum / Metodología](#scrum--metodología)
 
 ---
@@ -192,6 +193,62 @@ return total ?? throw new NotFoundException(nameof(Models.Regata), regataId);
 Con un `int`, los dos casos darían `0`. Al salir por `??`, el compilador sabe que ya no puede ser `null` y convierte el resultado en `int` él solo.
 
 **Truco relacionado:** en Moq, `ReturnsAsync(null)` a secas es ambiguo porque encaja en varias sobrecargas. Hay que escribir `ReturnsAsync((int?)null)`, igual que en Java a veces hay que poner `thenReturn((Integer) null)`.
+
+---
+
+### Argumentos con nombre
+
+**Qué es:** al llamar a un método se puede escribir el nombre del parámetro delante del valor: `metodo(nombre: valor)`. Así la llamada se lee sola y los argumentos se pueden pasar en cualquier orden. Se combina con los **parámetros opcionales** (`CancellationToken ct = default`), porque permite saltarse los opcionales intermedios.
+
+**Equivalente en Java:** no existe. En Java solo cuenta la posición, y para que una llamada con muchos parámetros se entienda se recurre a un *builder* o a sobrecargas.
+
+**Ejemplo real (migración `AmarreSetNullAlBorrarBarco`, #154):**
+```csharp
+migrationBuilder.AddForeignKey(
+    name: "FK_Amarres_Barcos_BarcoId",
+    table: "Amarres",
+    column: "BarcoId",
+    principalTable: "Barcos",
+    principalColumn: "Id",
+    onDelete: ReferentialAction.SetNull);
+```
+Sin los nombres serían seis valores seguidos, y habría que abrir la firma del método para saber cuál es cuál.
+
+---
+
+### partial class
+
+**Qué es:** una misma clase repartida entre varios archivos. Cada parte se declara con `partial` y el compilador las junta en una sola clase. Se usa sobre todo cuando una herramienta genera una parte del código y tú escribes la otra: así puedes regenerar la parte automática sin pisar la tuya.
+
+**Equivalente en Java:** no existe. En Java una clase pública vive en un único archivo. Lo más parecido es el código que genera Lombok, pero ese no se ve como archivo aparte.
+
+**Ejemplo real (#154):** cada migración de EF Core son dos archivos con la misma clase:
+```csharp
+// Migrations/20261005181450_AmarreSetNullAlBorrarBarco.cs: Up() y Down(), lo que se revisa
+public partial class AmarreSetNullAlBorrarBarco : Migration { ... }
+
+// Migrations/20261005181450_AmarreSetNullAlBorrarBarco.Designer.cs: generado, no se toca
+partial class AmarreSetNullAlBorrarBarco { ... }
+```
+
+---
+
+### Operadores con tipos anulables (lifted operators)
+
+**Qué es:** los operadores de un tipo de valor (`==`, `<`, `+`...) también funcionan con su versión anulable (`long?`, `int?`). C# los "eleva" (*lift*) y define qué pasa con el `null`:
+- `==` y `!=` comparan sin fallar: `null == 5` es `false` y `null == null` es `true`.
+- `<`, `>`, `<=` y `>=` devuelven `false` si algún lado es `null` (ojo: `null < 5` **y** `null > 5` son los dos `false`).
+- Los aritméticos propagan el `null`: `null + 1` es `null`.
+
+**Equivalente en Java:** con `Long a = null`, la expresión `a == 5L` obliga a hacer *unboxing* y lanza `NullPointerException`. En C# no hay excepción.
+
+**Ejemplo real (`AmarreService.AssignBarcoAsync`, #172):**
+```csharp
+// amarre.BarcoId es long? (puede ser null si el amarre está libre); dto.BarcoId es long
+if (amarre.BarcoId == dto.BarcoId)   // amarre libre → null == 7 → false, sin excepción
+    return amarre.ToDto();           // ya estaba asignado a ese barco: idempotente
+```
+Para preguntar por el `null` en sí, el proyecto usa los patrones `is null` / `is not null`.
 
 ---
 
@@ -372,6 +429,8 @@ dotnet user-jwts list   --project .\MarinaApi               # los ya emitidos
 ```
 En Swagger: botón **Authorize**, se pega el token **sin** el prefijo `Bearer`.
 
+**Un JWT está firmado, no cifrado.** Sus tres partes (cabecera, contenido y firma) van en Base64URL: cualquiera que tenga el token puede leer su contenido, por ejemplo en jwt.io. La firma solo garantiza que nadie lo ha modificado. Por eso no se meten datos sensibles en un JWT, y un token **no se pega** en chats, tickets ni capturas: mientras no caduque, quien lo tenga puede usarlo.
+
 ---
 
 ### FallbackPolicy, [Authorize] y [AllowAnonymous]
@@ -503,6 +562,66 @@ Con 20 barcos salían 21 consultas. Después del arreglo (PR #6), sale **1** sie
 **Cómo arreglarlo:**
 - **`Include`**, cuando necesitas los objetos relacionados enteros: los trae en la misma consulta.
 - **Proyección con `Select`**, cuando solo necesitas unos datos o un cálculo (un total, un contador). Es la opción preferible.
+
+---
+
+### OnDelete y DeleteBehavior: qué pasa al borrar el principal
+
+**Qué es:** `.OnDelete(DeleteBehavior.X)` decide qué les pasa a los **dependientes** (las filas que tienen la FK) cuando se borra el **principal**. Va siempre en ese sentido, del principal al dependiente, aunque configures la relación desde cualquiera de los dos lados. Hace dos cosas:
+1. Dice qué hace EF Core con las entidades que tiene cargadas en memoria (*tracked*).
+2. Escribe la cláusula `ON DELETE ...` de la FK cuando se genera la migración. A partir de ahí la regla la aplica **la base de datos**, aunque el borrado venga de Workbench o de otro programa.
+
+| `DeleteBehavior` | En la base de datos | Uso típico |
+|---|---|---|
+| `Cascade` | `ON DELETE CASCADE` | El dependiente no tiene sentido sin el principal. **Por defecto en relaciones obligatorias** (FK no anulable) |
+| `SetNull` | `ON DELETE SET NULL` | El dependiente sobrevive sin el principal. Necesita la FK anulable |
+| `ClientSetNull` | `NO ACTION` | **Por defecto en relaciones opcionales** (FK anulable). EF pone `null` solo en lo que tiene cargado; si el dependiente no está cargado, la BD rechaza el borrado |
+| `Restrict` / `NoAction` | `RESTRICT` / `NO ACTION` | Prohibido borrar el principal si tiene dependientes |
+| `ClientCascade` | `NO ACTION` | EF borra en cascada solo lo que tiene cargado (lo más parecido a la cascada de JPA) |
+
+**Equivalente en Java:** `cascade = CascadeType.REMOVE` (o `ALL`) y `orphanRemoval` los ejecuta **Hibernate en memoria**, y solo si el borrado pasa por él; no cambian el esquema. Lo que se parece de verdad a `OnDelete` es la anotación `@OnDelete(action = OnDeleteAction.CASCADE)` de Hibernate (`SET_NULL` desde Hibernate 6.2), que sí escribe el `ON DELETE` en la tabla.
+
+**Ejemplo real (#154, `MarinaApi/Data/MarinaDbContext.cs`):**
+```csharp
+modelBuilder.Entity<Amarre>()
+    .HasOne(a => a.Barco)
+    .WithOne(b => b.Amarre)
+    .HasForeignKey<Amarre>(a => a.BarcoId)   // la FK está en Amarre: Amarre es el dependiente
+    .OnDelete(DeleteBehavior.SetNull);       // antes era Cascade: borrar un barco borraba su amarre
+```
+El bug del #154 venía de pensar en JPA ("cascada desde Barco hacia Amarre = `CascadeType.ALL`"). En EF Core, `Cascade` borra **el lado que tiene la FK**, que aquí era el amarre: justo el que tenía que sobrevivir. Tabla corregida en [[Migración de Java a CSharp#4.4. Cascade — misma idea, sintaxis distinta]].
+
+---
+
+### Los archivos de una migración
+
+**Qué es:** `dotnet ef migrations add <Nombre>` compara el modelo actual (`OnModelCreating` y las entidades) con `MarinaDbContextModelSnapshot.cs`, que guarda cómo era el modelo en la última migración. Con la diferencia crea o toca tres archivos:
+
+| Archivo | Para qué sirve | ¿Se revisa? |
+|---|---|---|
+| `<fecha>_<Nombre>.cs` | `Up()` aplica el cambio y `Down()` lo deshace | **Sí, siempre**, antes de aplicarla |
+| `<fecha>_<Nombre>.Designer.cs` | Foto del modelo completo en ese momento (`partial class`) | No, es generado |
+| `MarinaDbContextModelSnapshot.cs` | El modelo "actual", con el que se comparará la próxima migración | No, pero se commitea con la migración |
+
+**Equivalente en Java:** es como un changeset de Flyway o Liquibase (`V2__...sql`), pero escrito automáticamente a partir de las entidades. No es `ddl-auto=update`: MySQL no se toca hasta lanzar `dotnet ef database update`, que además apunta la migración en la tabla `__EFMigrationsHistory` (el `flyway_schema_history` de Flyway).
+
+**Ejemplo real (#154):** cambiar la acción de una FK genera un `DropForeignKey` seguido de un `AddForeignKey`, porque ningún motor permite modificar una FK en el sitio. Para ver el SQL exacto antes de aplicarlo:
+```powershell
+dotnet ef migrations script InitialCreate AmarreSetNullAlBorrarBarco --project .\MarinaApi
+```
+**Por qué revisar `Up()`:** si renombras una propiedad, EF Core a veces genera `DropColumn` + `AddColumn` en lugar de `RenameColumn`, y esa columna pierde los datos sin ningún aviso.
+
+---
+
+### En MySQL el DDL no es transaccional
+
+**Qué es:** en MySQL, cada sentencia DDL (`CREATE`, `ALTER`, `DROP`...) hace un **commit implícito**: no se puede deshacer con un `ROLLBACK`. Si una migración tiene dos `ALTER TABLE` y falla el segundo, el primero ya se ha quedado aplicado, y la migración no consta en `__EFMigrationsHistory`. Hay que arreglarlo a mano.
+
+**Diferencia entre motores:** en **PostgreSQL** y **SQL Server** el DDL sí es transaccional: si algo falla, se deshace toda la migración. Es una de las diferencias reales al pasar de SQL Server a MySQL.
+
+**Equivalente en Java:** igual con Flyway sobre MySQL. Su documentación avisa de que en MySQL una migración fallida a medias deja el esquema en un estado intermedio.
+
+**Ejemplo real (#154):** el script de `AmarreSetNullAlBorrarBarco` acaba en `COMMIT`, pero entre el `DROP FOREIGN KEY` y el `ADD CONSTRAINT` ya ha habido un commit. Si fallara el segundo, la tabla `Amarres` se quedaría **sin FK**. Por eso, en un entorno real, el script se revisa antes (`migrations script --idempotent`) en lugar de lanzar `database update` a ciegas.
 
 ---
 
@@ -753,6 +872,29 @@ _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationTo
 
 ---
 
+### Lo que no prueba el proveedor InMemory
+
+**Qué es:** `UseInMemoryDatabase` guarda las entidades en memoria, sin SQL ni base de datos real. Es rápido para tests, pero:
+- **No soporta transacciones.** `BeginTransactionAsync` lanza un error, salvo que se ignore el aviso `TransactionIgnoredWarning`. Por eso `RegataService.DeleteAsync` se quedó sin test en el #152.
+- **No traduce a SQL.** Una consulta LINQ que MySQL no sabría ejecutar puede pasar en InMemory.
+- **No tiene restricciones de la BD.** No aplica `ON DELETE`, FKs ni índices únicos: solo lo que hace EF en memoria.
+
+**Equivalente en Java:** H2 en modo memoria en los tests de Spring. Con H2 se ejecuta SQL de verdad, pero en otro dialecto, así que también puede dar falsos verdes. La alternativa seria en los dos mundos es **Testcontainers** con el motor real (MySQL).
+
+**Regla del proyecto:** un unit test con el repositorio mockeado prueba la lógica del Service, no la consulta. La consulta y el esquema (como el `ON DELETE SET NULL` del #154) se verifican contra MySQL: a mano en Swagger o con un test de integración.
+
+---
+
+### Mutation testing (la idea)
+
+**Qué es:** una forma de comprobar si los tests sirven. Se cambia el código adrede (se invierte un `if`, un `==` pasa a `!=`, se borra una línea...) y se lanzan los tests. Si alguno se pone en rojo, el "mutante" ha muerto y los tests vigilan esa línea. Si todos siguen en verde, esa línea podría estar mal y nadie se daría cuenta.
+
+**Herramientas:** **Stryker.NET** en .NET y **PIT** (pitest) en Java. Generan los mutantes automáticamente y dan un porcentaje de "mutantes muertos", mucho más fiable que la cobertura de líneas.
+
+**Ejemplo real (#172, a mano):** Igor movió el `if` idempotente de `AssignBarcoAsync` al final del método, y el test `CuandoElMismoBarcoYaEstaEnEseAmarre` se puso en rojo (lo cazaba el `if` de "amarre ocupado"). Ese test mata ese mutante.
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM
@@ -796,6 +938,24 @@ git pull
 git branch -D fix/seguridad-secretos
 git push origin --delete fix/seguridad-secretos   # o el botón "Delete branch" del PR
 ```
+
+---
+
+## Errores frecuentes (compilación y entorno)
+
+Errores que ya han salido en el proyecto y que no son de lógica, sino de herramientas o de entorno. Cada uno costó tiempo la primera vez.
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| **MSB3027** / MSB3021: *Could not copy ... The file is locked by: "MarinaApi (PID)"* | La API sigue arrancada y Windows bloquea su `.dll` | Parar la API (Ctrl+C) antes de `dotnet build`/`test`, o trabajar con `dotnet watch run` |
+| **MSB1003**: *Specify a project or solution file* | `dotnet test` en la raíz de `Marina_C#`, donde no hay `.sln` | `dotnet test MarinaApi.Tests` (o crear la solución con `dotnet new sln` + `dotnet sln add`) |
+| **CS7036**: *There is no argument given that corresponds to the required parameter* | Se añadió un parámetro a un `record` posicional y algún `new` no lo pasa. En un record posicional todo parámetro es obligatorio, aunque admita `null` | Pasarlo en todas las llamadas (normalmente en el Mapper) o darle valor por defecto |
+| **CS0121**: *The call is ambiguous between...* con `ReturnsAsync(null)` | El `null` encaja en varias sobrecargas | `ReturnsAsync((Amarre?)null)` (ver Testing) |
+| `DirectoryNotFoundException: ...\wwwroot` al arrancar la API | Manifiesto `*.staticwebassets.runtime.json` de **otra rama** (la #171) en `bin/` y `obj/`. Cambiar de rama no limpia `bin/` | `dotnet clean .\MarinaApi` y volver a arrancar (ha pasado tres veces) |
+| `dotnet ef ...` falla con *Unable to connect to any of the specified MySQL hosts* | `ServerVersion.AutoDetect(...)` en `Program.cs` consulta la versión a MySQL al crear el `DbContext`, también en tiempo de diseño (`migrations add`) | `docker start marina-mysql` antes de cualquier comando `dotnet ef` |
+| `dotnet watch` se para con `Contract.Fail` en `HotReloadMSBuildWorkspace` | Fallo interno de *hot reload* al crear archivos nuevos, no del código propio | Reiniciar `dotnet watch`. Para cambios solo en `wwwroot` basta `dotnet run` + F5 |
+
+**Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 
 ---
 

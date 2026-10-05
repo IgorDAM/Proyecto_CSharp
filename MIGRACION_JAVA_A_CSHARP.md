@@ -505,7 +505,7 @@ dotnet ef database update
 | Relación (propiedad nav.) | `@OneToMany` | Convención: `List<T>` o Fluent API |
 | FK explícita | `@JoinColumn(name = "...")` | Convención: `[Nombre]Id`, o Fluent API |
 | Lado inverso | `mappedBy = "..."` | Fluent API: `.WithMany()` / `.WithOne()` |
-| Cascade | `cascade = CascadeType.ALL` | Fluent API: `.OnDelete(DeleteBehavior.Cascade)` |
+| Borrado en cascada | `cascade = CascadeType.REMOVE` (o `ALL`): lo ejecuta Hibernate en memoria | Fluent API: `.OnDelete(DeleteBehavior.Cascade)`: queda en la BD como `ON DELETE CASCADE` y borra el lado que tiene la FK (ver 4.4) |
 
 ### El Concepto Clave
 
@@ -580,7 +580,7 @@ private Amarre amarre;
 | Dónde se declara la relación | Dentro de cada entidad, con anotaciones | Fuera, centralizado en `OnModelCreating` |
 | Entidad propietaria (tiene la FK) | Sin `mappedBy` | `.HasForeignKey<T>()` indica cuál |
 | Lado inverso | Con `mappedBy = "..."` | `.WithOne()` / `.WithMany()` |
-| Cascada | `cascade = CascadeType.ALL` | `.OnDelete(DeleteBehavior.Cascade)` |
+| Cascada | `cascade = CascadeType.REMOVE` / `ALL` (en memoria, desde el lado que lo declara) | `.OnDelete(...)` (en el esquema, siempre del principal al dependiente; ver 4.4) |
 
 > **Buena práctica:** tener toda la configuración de relaciones **en un solo archivo** (`MarinaDbContext.cs`) en vez de repartida entre varias clases con anotaciones es una ventaja real de EF Core: cuando algo no cuadra en las relaciones de tu BD, sabes exactamente dónde mirar.
 
@@ -631,11 +631,20 @@ modelBuilder.Entity<Barco>()
 
 ## 4.4. Cascade — misma idea, sintaxis distinta
 
-| `CascadeType` de Java | `DeleteBehavior` de C# |
-|---|---|
-| `CascadeType.REMOVE` | `DeleteBehavior.Cascade` |
-| `CascadeType.ALL` (sin remove) | `DeleteBehavior.ClientCascade` o configurarlo por tipo de operación |
-| Sin cascade | `DeleteBehavior.Restrict` (por defecto en EF Core) |
+> **Corrección (2026-10-05, ticket #154):** la versión anterior de esta tabla igualaba `CascadeType.ALL` con `DeleteBehavior.Cascade` y daba `Restrict` como valor por defecto. Las dos cosas eran incorrectas, y la primera es justo la confusión que causó el bug del #154 (borrar un barco borraba su amarre).
+
+**La diferencia de fondo:** en JPA, la cascada la ejecuta **Hibernate en memoria**, desde el lado donde la declaras, y solo si el borrado pasa por él. En EF Core, `OnDelete` va **siempre del principal al dependiente** (el que tiene la FK) y se escribe **en el esquema** como `ON DELETE ...`, así que la aplica la base de datos.
+
+| Lo que quieres | Java (JPA / Hibernate) | C# (EF Core) | En la BD |
+|---|---|---|---|
+| Borrar los dependientes con el principal | `CascadeType.REMOVE` / `ALL` / `orphanRemoval` (en memoria), o `@OnDelete(action = OnDeleteAction.CASCADE)` (en el esquema) | `DeleteBehavior.Cascade` (**por defecto si la FK es obligatoria**) | `ON DELETE CASCADE` |
+| Que el dependiente sobreviva con la FK a `null` | A mano (poner la FK a `null` antes de borrar), o `@OnDelete(action = OnDeleteAction.SET_NULL)` (Hibernate 6.2+) | `DeleteBehavior.SetNull` (FK anulable) | `ON DELETE SET NULL` |
+| Que EF/Hibernate pongan `null` solo en lo cargado | Comportamiento por defecto sin cascade | `DeleteBehavior.ClientSetNull` (**por defecto si la FK es anulable**) | `NO ACTION` |
+| Prohibir borrar si hay dependientes | Sin cascade (la FK de la BD lo rechaza) | `DeleteBehavior.Restrict` / `NoAction` | `RESTRICT` / `NO ACTION` |
+| Cascada solo en memoria | `CascadeType.REMOVE` | `DeleteBehavior.ClientCascade` | `NO ACTION` |
+| Guardar entidades nuevas relacionadas | `CascadeType.PERSIST` / `MERGE` | No hace falta: `Add`/`Update` recorren el grafo | — |
+
+**Caso real (#154):** `Amarre → Barco` tenía `.OnDelete(DeleteBehavior.Cascade)` con el comentario "equivalente a `CascadeType.ALL + orphanRemoval`". Como la FK `BarcoId` está en `Amarre`, al borrar un barco MySQL borraba la fila del amarre. Se cambió a `SetNull` con la migración `AmarreSetNullAlBorrarBarco`. Detalle en [[Glosario CSharp#OnDelete y DeleteBehavior: qué pasa al borrar el principal]].
 
 ## 4.5. Ejercicio
 

@@ -12,7 +12,7 @@
 
 | Ticket | Título | Tipo | Prioridad | Puntos | Depende de | Estado |
 |---|---|---|---|---|---|---|
-| **#154** | Borrar un Barco elimina también su Amarre | Bug | 🔴 | 2 | — | ⬜ |
+| **#154** | Borrar un Barco elimina también su Amarre | Bug | 🔴 | 2 | — | ✅ [PR #12](https://github.com/IgorDAM/Proyecto_CSharp/pull/12) |
 | **#155** | Asignación concurrente de barco devuelve 500 en vez de 409 | Bug | 🔴 | 2 | — | ⬜ |
 | **#156** | Credenciales de MySQL versionadas en `appsettings.json` | Seguridad | 🔴 | 2 | #171 | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
 | **#157** | `Precio` de Amarre como `double` en vez de `decimal` | Bug | 🔴 | 3 | — | ⬜ |
@@ -35,27 +35,28 @@
 | **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ⬜ |
 | **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ⬜ |
 | **#176** | HSTS fuera de Development | Producción | 🟢 | 1 | — | ⬜ |
+| **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
 
-**Total: 50 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30; ya hechos: #156, #159, #168 y #171). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 53 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177; ya hechos: #154, #156, #159, #168, #171 y #172). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154, #155, #156 ✅, #157, #159 ✅, #161, #162, #171 ✅ — más #172, #173 y #174 de la revisión de seguridad
-- **Sprint 2 (deuda técnica, 13 pts):** #158, #160, #163, #164
+- **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
 - **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 y #176
 
 ---
 
 ## 🔴 Prioridad alta
 
-### #154 — Borrar un Barco elimina también su Amarre
+### #154 — Borrar un Barco elimina también su Amarre ✅ [PR #12](https://github.com/IgorDAM/Proyecto_CSharp/pull/12)
 
 - **Tipo:** Bug · **Puntos:** 2
 - **Problema:** en [MarinaDbContext.cs](MarinaApi/Data/MarinaDbContext.cs), la relación 1:1 `Amarre → Barco` está configurada con `.OnDelete(DeleteBehavior.Cascade)`. Como la FK `BarcoId` está en `Amarre`, **al borrar un barco se borra la fila del amarre**. Un amarre es infraestructura física del puerto: debería quedar libre (`BarcoId = NULL`), no desaparecer. El comentario del código lo presenta como equivalente a `CascadeType.ALL + orphanRemoval`, pero en la práctica borra el lado que debería sobrevivir.
 - **Criterios de aceptación:**
-  - [ ] La relación usa `DeleteBehavior.SetNull`.
-  - [ ] Nueva migración generada y revisada (`dotnet ef migrations add AmarreSetNullAlBorrarBarco`).
-  - [ ] Test de integración: al crear un barco con amarre y hacer `DELETE /api/Barcos/{id}`, el amarre sigue existiendo con `BarcoId = null`.
-  - [ ] Actualizado el comentario del `DbContext`.
+  - [x] La relación usa `DeleteBehavior.SetNull`.
+  - [x] Nueva migración generada y revisada (`dotnet ef migrations add AmarreSetNullAlBorrarBarco`): `DROP FOREIGN KEY` + `ADD CONSTRAINT ... ON DELETE SET NULL`.
+  - [x] ~~Test de integración~~ → verificado a mano en Swagger contra MySQL (2026-10-05): barco 3 con amarre 2 → `DELETE /api/Barcos/3` 204 → `GET /api/Amarres/2` 200 con `barcoId: null`. El test automático pasa al **#177**, porque InMemory no aplica `ON DELETE` y el proyecto no tenía infraestructura de integración.
+  - [x] Actualizado el comentario del `DbContext`.
 - **Guía:** Lección 8.4 (entidades y relaciones), Lección 12.2 (invariantes de dominio).
 
 ### #155 — Asignación concurrente de barco devuelve 500 en vez de 409
@@ -205,6 +206,18 @@
   - [ ] `docker ps` muestra `127.0.0.1:3306->3306/tcp`; la API arranca y responde 200 con token.
   - [ ] Borrado el contenedor `marina-sqlserver` (parado desde el 2026-09-30) y su volumen, si ya no hace falta.
 - **Guía:** sección 2.6 de `MIGRACION_JAVA_A_CSHARP.md`.
+
+### #177 — Tests de integración contra MySQL real (Testcontainers)
+
+- **Tipo:** Calidad · **Puntos:** 3 · **Origen:** #154 (2026-10-05)
+- **Problema:** todos los tests usan Moq o el proveedor InMemory, que no ejecuta SQL ni aplica restricciones de la base de datos (`ON DELETE`, FKs, índices únicos) ni transacciones. Un test del #154 con InMemory saldría en verde aunque la FK siguiera en `Cascade`. Lo mismo pasa con el #155 (índice único → error 1062).
+- **Criterios de aceptación:**
+  - [ ] Proyecto o carpeta de tests de integración con `WebApplicationFactory<Program>` y `Testcontainers.MySql` (MySQL 8.0 en Docker, creado y destruido por los tests).
+  - [ ] Migraciones aplicadas al contenedor con `Database.MigrateAsync()` (prueba también las migraciones, no solo el modelo).
+  - [ ] Autenticación resuelta para los tests (esquema de prueba o token generado), sin desactivar la `FallbackPolicy` en producción.
+  - [ ] Primer test: crear barco con amarre → `DELETE /api/Barcos/{id}` → el amarre sigue con `barcoId = null` (criterio pendiente del #154).
+  - [ ] `dotnet test` sigue funcionando sin Docker para los unit tests (los de integración, separados o con `[Trait]`).
+- **Guía:** equivalente a `@SpringBootTest` + `@Testcontainers` + `@Container MySQLContainer` en Spring.
 
 ## 🟢 Prioridad baja
 
