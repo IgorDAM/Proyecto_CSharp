@@ -32,17 +32,18 @@
 | **#171** | `docker-compose.yml` levanta SQL Server en vez de MySQL | Bug | 🔴 | 2 | — | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
 | **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ✅ [PR #11](https://github.com/IgorDAM/Proyecto_CSharp/pull/11) |
 | **#173** | El contenedor `marina-mysql` publica el 3306 en toda la red local | Seguridad | 🟠 | 1 | — | ⬜ |
-| **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ⬜ |
+| **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ✅ [PR #14](https://github.com/IgorDAM/Proyecto_CSharp/pull/14) |
 | **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ⬜ |
 | **#176** | HSTS fuera de Development | Producción | 🟢 | 1 | — | ⬜ |
 | **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
+| **#178** | Mensaje de `NotFoundException` siempre en masculino ("Regata ... no encontrado") | Calidad | 🟢 | 1 | — | ⬜ |
 
-**Total: 53 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177; ya hechos: #154, #156, #159, #168, #171 y #172). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 54 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178; ya hechos: #154, #156, #159, #168, #171, #172 y #174). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154, #155, #156 ✅, #157, #159 ✅, #161, #162, #171 ✅ — más #172, #173 y #174 de la revisión de seguridad
 - **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
-- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 y #176
+- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175, #176 y #178
 
 ---
 
@@ -262,14 +263,14 @@
   - [x] ~~`AllowAnyOrigin` solo en `Development`~~ → descartado: la lista vacía se usa también en Development, porque con `AllowAnyOrigin` cualquier web abierta en el navegador podía llamar a la API en `localhost`. El frontend de `wwwroot` es el mismo origen y no necesita CORS.
 - **Guía:** Lección 13.6.
 
-### #174 — `DesinscribirBarcoAsync` responde 204 aunque la regata no exista
+### #174 — `DesinscribirBarcoAsync` responde 204 aunque la regata no exista ✅ [PR #14](https://github.com/IgorDAM/Proyecto_CSharp/pull/14)
 
 - **Tipo:** Bug · **Puntos:** 1 · **Origen:** revisión de seguridad del 2026-09-30
 - **Problema:** `RegataService.DesinscribirBarcoAsync` solo comprueba que exista el barco. `DELETE /api/Regatas/9999/barcos/1` devuelve 204 aunque la regata 9999 no exista, cuando `InscribirBarcoAsync` sí responde 404 en ese caso. El cliente no puede distinguir "retirado" de "no había nada que retirar".
 - **Criterios de aceptación:**
-  - [ ] Test en `RegataServiceTests`: la regata no existe → `NotFoundException`.
-  - [ ] Comprobación con `_regataRepository.ExistsAsync` antes de tocar el barco.
-  - [ ] Decidido: si el barco existe pero no estaba inscrito en esa regata, ¿204 (idempotente, como ahora) o 404?
+  - [x] Test en `RegataServiceTests`: la regata no existe → `NotFoundException` (con el barco existente y `.WithMessage("*Regata*999*")`).
+  - [x] Comprobación con `_regataRepository.ExistsAsync` antes de tocar el barco.
+  - [x] Decidido (2026-10-06): barco no inscrito → **204 idempotente**, fijado con el test `CuandoBarcoNoEstabaInscrito_NoLanzaYNoCambiaNada`.
 
 ### #175 — Paginación en los listados `GET`
 
@@ -289,6 +290,15 @@
 - **Criterios de aceptación:**
   - [ ] `app.UseHsts()` solo cuando `!app.Environment.IsDevelopment()` (en local rompería `http://localhost:5000`).
   - [ ] Comentario que explique por qué no se activa en Development.
+
+### #178 — Mensaje de `NotFoundException` siempre en masculino
+
+- **Tipo:** Calidad · **Puntos:** 1 · **Origen:** experimento 4 del #171 (2026-09-29) y #174 (2026-10-06)
+- **Problema:** `NotFoundException` construye el mensaje con `$"{entidad} con Id {id} no encontrado."`, así que las entidades femeninas salen mal: "Regata con Id 9999 no encontrado.". Lo ve el cliente en el `detail` del ProblemDetails.
+- **Criterios de aceptación:**
+  - [ ] Mensaje sin género que valga para cualquier entidad, p. ej. `"{entidad} con Id {id} no existe."` ("Regata con Id 9999 no existe.", "Barco con Id 9999 no existe.").
+  - [ ] Actualizados los tests que comprueban el texto (`.WithMessage(...)` con comodines no deberían romperse).
+- **Guía:** decisión pequeña de diseño de mensajes; en Spring sería el `MessageSource` con `messages.properties`, y en .NET los archivos `.resx` si algún día hace falta traducir.
 
 ### #169 — Versionado de la API (v1 explícita)
 

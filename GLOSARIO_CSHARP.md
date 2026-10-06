@@ -895,6 +895,29 @@ _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationTo
 
 ---
 
+### Falso verde: un test que pasa por la razón equivocada
+
+**Qué es:** un test que sale en verde aunque el código que dice probar esté mal, porque la condición que comprueba se cumple por otro motivo. Es peor que un test en rojo: da una seguridad que no existe. Con mocks *loose* es fácil caer en él, porque todo lo que no tiene `Setup` devuelve `null`/`false`/`0` sin avisar, y eso puede provocar la misma excepción que esperabas por otro camino.
+
+**Equivalente en Java:** igual con Mockito, que también devuelve `null`/`false` por defecto. Un `assertThrows(NotFoundException.class, ...)` sin mirar el mensaje tiene el mismo riesgo.
+
+**Ejemplo real (#174, `RegataServiceTests.cs`):** al añadir `ExistsAsync` de la regata a `DesinscribirBarcoAsync`, el test `CuandoBarcoNoExiste_LanzaNotFoundException` **siguió en verde**, pero ahora la `NotFoundException` era de la regata (el mock devolvía `false` en `ExistsAsync`), no del barco. Si alguien hubiera borrado la comprobación del barco, el test no se habría enterado.
+
+**Dos defensas:**
+1. **En cada test de error, existe todo menos lo que se prueba.** Si el test es "el barco no existe", la regata tiene que existir (`ExistsAsync → true`). Así el error solo puede venir de un sitio.
+2. **Comprobar el mensaje, no solo el tipo:**
+```csharp
+await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
+    .Should().ThrowAsync<NotFoundException>()
+    .WithMessage("*Barco*999*");   // * = comodín; en AssertJ, hasMessageContaining("Barco")
+```
+
+**Cómo detectarlo:** escribir el test en rojo **antes** del arreglo (TDD) y comprobar que el rojo dice lo esperado. En el #174, el test nuevo se escribió con el barco existente a propósito: sin eso habría salido en verde desde el principio, por la `NotFoundException` del barco.
+
+**Relacionado (#174):** para afirmar que **no** pasa nada, `.Should().NotThrowAsync()` (`assertDoesNotThrow` en JUnit), y para comprobar el contenido de una colección, `barco.Regatas.Should().ContainSingle(r => r.Id == 2)`: exactamente un elemento y que cumple la condición (`assertThat(lista).singleElement().matches(...)` en AssertJ). Ver [[Guía definitiva de CSharp]] para el resto de aserciones.
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM
