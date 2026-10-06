@@ -72,16 +72,27 @@ public class RegataService : IRegataService
         }
     }
 
-    /// <summary>Equivalente a RegataService.desinscribirBarco() de Java.</summary>
+    /// <summary>
+    /// Retira un barco de una regata (relación N:M). Equivalente a
+    /// RegataService.desinscribirBarco() de Java.
+    /// <list type="number">
+    ///   <item>La regata no existe → <see cref="NotFoundException"/> (404).</item>
+    ///   <item>El barco no existe → <see cref="NotFoundException"/> (404).</item>
+    ///   <item>El barco no estaba inscrito en esa regata → no hace nada (204 idempotente,
+    ///   igual que <see cref="InscribirBarcoAsync"/> si ya estaba inscrito).</item>
+    /// </list>
+    /// </summary>
     public async Task DesinscribirBarcoAsync(long regataId, long barcoId, CancellationToken ct = default)
     {
+        if (!await _regataRepository.ExistsAsync(regataId, ct))
+            throw new NotFoundException(nameof(Models.Regata), regataId);
+
         var barco = await _barcoRepository.FindByIdWithRegatasAsync(barcoId, ct)
             ?? throw new NotFoundException(nameof(Models.Barco), barcoId);
 
         barco.Regatas.RemoveAll(r => r.Id == regataId);
         await _context.SaveChangesAsync(ct);
     }
-
     /// <summary>
     /// Suma los tripulantes de todos los barcos inscritos en una regata.
     /// Lo calcula la base de datos en una sola consulta (proyección con SUM/COUNT

@@ -21,7 +21,7 @@ public class RegataServiceTests
     {
         _regataRepositoryMock = new Mock<IRegataRepository>();
         _barcoRepositoryMock = new Mock<IBarcoRepository>();
-        
+
         var options = new DbContextOptionsBuilder<MarinaDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
@@ -226,6 +226,8 @@ public class RegataServiceTests
         _barcoRepositoryMock.Setup(b => b.FindByIdWithRegatasAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(barco);
 
+        _regataRepositoryMock.Setup(r => r.ExistsAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         // Act
         await _service.DesinscribirBarcoAsync(1, 1);
 
@@ -236,12 +238,50 @@ public class RegataServiceTests
     [Fact]
     public async Task DesinscribirBarcoAsync_CuandoBarcoNoExiste_LanzaNotFoundException()
     {
-        // Arrange
+        // Arrange: la regata SÍ existe; lo único que falla es el barco
+        _regataRepositoryMock.Setup(r => r.ExistsAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         _barcoRepositoryMock.Setup(b => b.FindByIdWithRegatasAsync(999, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Barco?)null);
 
         // Act + Assert
         await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
-            .Should().ThrowAsync<NotFoundException>();
+            .Should().ThrowAsync<NotFoundException>()
+            .WithMessage("*Barco*999*");
+    }
+    [Fact]
+    public async Task DesinscribirBarcoAsync_CuandoRegataNoExiste_LanzaNotFoundException()
+    {
+        // Arrange: el barco SÍ existe; lo único que falla es la regata
+        var barco = new Barco { Id = 1, Nombre = "Test", Regatas = new List<Regata>() };
+        _barcoRepositoryMock.Setup(b => b.FindByIdWithRegatasAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(barco);
+        _regataRepositoryMock.Setup(r => r.ExistsAsync(999, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        // Act + Assert
+        await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(999, 1))
+            .Should().ThrowAsync<NotFoundException>()
+            .WithMessage("*Regata*999*");
+
+        _barcoRepositoryMock.Verify(b => b.FindByIdWithRegatasAsync(It.IsAny<long>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DesinscribirBarcoAsync_CuandoBarcoNoEstabaInscrito_NoLanzaYNoCambiaNada()
+    {
+        // Arrange: regata y barco existen, pero el barco está inscrito en OTRA regata (la 2)
+        var otraRegata = new Regata { Id = 2, Nombre = "Otra", Lugar = "Avilés" };
+        var barco = new Barco { Id = 1, Nombre = "Test", Regatas = new List<Regata> { otraRegata } };
+        _regataRepositoryMock.Setup(r => r.ExistsAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        _barcoRepositoryMock.Setup(b => b.FindByIdWithRegatasAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(barco);
+
+        // Act + Assert: decisión del #174 → idempotente (204), no 404
+        await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 1))
+            .Should().NotThrowAsync();
+
+        barco.Regatas.Should().ContainSingle(r => r.Id == 2);
     }
 }
