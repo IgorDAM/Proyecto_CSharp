@@ -39,5 +39,5 @@ Este archivo es el mapa: dice qué hay en cada documento y cuándo se actualiza.
 ## Espejo en el vault y convenciones
 
 - Las tres guías de estudio (`GUIA_DEFINITIVA_CSHARP_1.md`, `MIGRACION_JAVA_A_CSHARP.md` y `GLOSARIO_CSHARP.md`) tienen una copia en el vault de Obsidian, en `Estudios/Programación/C#/`. Cada cambio en el repo se copia también al espejo.
-- Entre documentos, las referencias usan wikilinks de Obsidian (`[[Glosario C#]]`), aunque en GitHub se vean como texto.
+- Entre documentos, las referencias usan wikilinks de Obsidian (`[[Glosario CSHARP]]`), aunque en GitHub se vean como texto.
 - Las referencias a archivos de código van en formato código, sin enlace.
