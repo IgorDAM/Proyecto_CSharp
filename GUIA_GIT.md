@@ -95,6 +95,7 @@ git switch master                                    # cambiar de rama
 git switch -c feature/154-asignar-amarre              # crear y cambiar
 git branch                                            # listar locales
 git branch -d feature/154-asignar-amarre              # borrar (solo si ya está mergeada)
+git branch -D feature/154-asignar-amarre              # borrar aunque no esté mergeada (¡sin red!)
 ```
 
 `HEAD` es el puntero a "dónde estás ahora" (la rama actual).
@@ -190,6 +191,24 @@ git branch -d feature/152-total-tripulantes-regata
 
 `-u` (upstream) enlaza tu rama local con la remota, así luego basta con
 `git push` y `git pull` sin argumentos.
+
+**Tras un "Squash and merge", `git branch -d` se niega** ("not fully merged"):
+GitHub creó un commit nuevo en `master` y git no reconoce los commits de tu rama
+como fusionados, aunque el contenido sí lo esté. Comprueba que no pierdes nada
+y usa `-D` (mayúscula), que borra sin esa comprobación.
+
+### Antes de subir: mira qué llevas
+
+```bash
+git log master..mi-rama --oneline    # commits que tiene mi-rama y master no
+git ls-files                          # archivos que git controla
+git ls-files "*.pdf"                  # ... filtrando por patrón
+```
+
+`master..mi-rama` (dos puntos) es un rango: "lo que está en `mi-rama` y no en
+`master`". Si sale algún commit que no esperabas, mejor verlo antes del PR. Con
+`git ls-files` compruebas si un archivo está bajo control de git o solo en tu
+disco (por ejemplo, para saber si hace falta `git rm` o basta con borrarlo).
 
 **Equivalente Java:** idéntico. Lo que cambia es el CI (`mvn test` frente a
 `dotnet test`).
@@ -352,3 +371,11 @@ variables de entorno (ver `GUIA_CICD.md`).
 ### PowerShell no se detiene si falla un comando encadenado
 
 Con `git switch master; git pull; git switch -c rama`, si `git pull` falla, PowerShell sigue y crea la rama a partir de un `master` sin actualizar. El `;` no mira si el anterior falló. En PowerShell 7 se puede usar `&&` (solo sigue si el anterior acabó bien), como en bash. En Windows PowerShell 5.1 no existe: hay que lanzar los comandos de uno en uno o comprobar `$LASTEXITCODE`.
+
+### El paginador: la pantalla que se queda en `:`
+
+`git diff`, `git log` y otros comandos largos abren un paginador (`less`) cuando la salida no cabe en pantalla. Se nota porque la última línea es un `:` y el cursor no vuelve al prompt. Se **sale con `q`**. Para que no se active, `git --no-pager diff` (o `git --no-pager log`). Si copias la salida a un chat o un ticket, el paginador la corta.
+
+### Los marcadores `<...>` de la documentación no se escriben
+
+En los ejemplos, `<ID>` o `<rama>` significan "pon aquí tu valor". Si los escribes tal cual en PowerShell, falla: `<` es un operador de redirección reservado y da *El operador '<' está reservado para uso futuro*. Se sustituye todo, incluidos los `<` y `>`: `dotnet user-jwts remove a1b2c3d4`, no `remove <a1b2c3d4>`.
