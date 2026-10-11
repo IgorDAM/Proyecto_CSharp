@@ -68,7 +68,10 @@ public class AmarreService : IAmarreService
     /// la operación es idempotente (#172).</item>
     /// <item>Si el Amarre está ocupado por OTRO Barco, 409: no se desaloja a nadie (#172).</item>
     /// <item>El Barco tiene que existir; si no, 404.</item>
-    /// <item>El Barco no puede tener ya otro Amarre; si no, 409.</item>
+    /// <item>El Barco no puede tener ya otro Amarre; si no, 409. Esta comprobación no
+    /// cubre dos peticiones simultáneas: en ese caso la protege el índice único de la
+    /// base de datos y <see cref="Repositories.AmarreRepository.UpdateAsync"/> traduce el
+    /// error a 409 (#155).</item>
     /// </list>
     /// </summary>
     public async Task<AmarreDto> AssignBarcoAsync(long id, AsignarBarcoDto dto, CancellationToken ct = default)
