@@ -48,7 +48,7 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
         return entity;
     }
 
-    public async Task UpdateAsync(T entity, CancellationToken ct = default)
+    public virtual async Task UpdateAsync(T entity, CancellationToken ct = default)
     {
         _dbSet.Update(entity);
         await _context.SaveChangesAsync(ct);
