@@ -81,4 +81,26 @@ public class AmarreRepositoryTests
         await FluentActions.Awaiting(() => repository.UpdateAsync(amarre))
             .Should().ThrowAsync<DbUpdateException>();
     }
+
+    [Fact]
+    public async Task UpdateAsync_CuandoElErrorMySqlNoEsUnDuplicado_NoLoTraduceYLoDejaPasar()
+    {
+        // Arrange: un MySqlException REAL pero de otro tipo (1213, deadlock).
+        // El filtro del repositorio solo debe traducir el 1062.
+        var errorMySql = CrearMySqlException(
+            MySqlErrorCode.LockDeadlock,
+            "Deadlock found when trying to get lock; try restarting transaction");
+        var errorEf = new DbUpdateException("Error al guardar los cambios.", errorMySql);
+
+        var options = new DbContextOptionsBuilder<MarinaDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var context = new DbContextQueFallaAlGuardar(options, errorEf);
+        var repository = new AmarreRepository(context);
+        var amarre = new Amarre { Id = 2, Ubicacion = "B-3", BarcoId = 5 };
+
+        // Act + Assert: sigue siendo DbUpdateException (acabará en 500), no ConflictException
+        await FluentActions.Awaiting(() => repository.UpdateAsync(amarre))
+            .Should().ThrowAsync<DbUpdateException>();
+    }
 }
