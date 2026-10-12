@@ -13,7 +13,7 @@
 | Ticket | Título | Tipo | Prioridad | Puntos | Depende de | Estado |
 |---|---|---|---|---|---|---|
 | **#154** | Borrar un Barco elimina también su Amarre | Bug | 🔴 | 2 | — | ✅ [PR #12](https://github.com/IgorDAM/Proyecto_CSharp/pull/12) |
-| **#155** | Asignación concurrente de barco devuelve 500 en vez de 409 | Bug | 🔴 | 2 | — | ⬜ |
+| **#155** | Asignación concurrente de barco devuelve 500 en vez de 409 | Bug | 🔴 | 2 | — | ✅ [PR #17](https://github.com/IgorDAM/Proyecto_CSharp/pull/17) |
 | **#156** | Credenciales de MySQL versionadas en `appsettings.json` | Seguridad | 🔴 | 2 | #171 | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
 | **#157** | `Precio` de Amarre como `double` en vez de `decimal` | Bug | 🔴 | 3 | — | ⬜ |
 | **#158** | Unit of Work: los repositorios no deben llamar a `SaveChangesAsync` | Deuda técnica | 🟠 | 5 | — | ⬜ |
@@ -41,7 +41,7 @@
 **Total: 54 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178; ya hechos: #154, #156, #159, #168, #171, #172 y #174). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
-- **Sprint 1 (bugs y riesgos, 16 pts):** #154, #155, #156 ✅, #157, #159 ✅, #161, #162, #171 ✅ — más #172, #173 y #174 de la revisión de seguridad
+- **Sprint 1 (bugs y riesgos, 16 pts):** #154, #155 ✅, #156 ✅, #157, #159 ✅, #161, #162, #171 ✅ — más #172, #173 y #174 de la revisión de seguridad
 - **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
 - **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175, #176 y #178
 
@@ -60,7 +60,7 @@
   - [x] Actualizado el comentario del `DbContext`.
 - **Guía:** Lección 8.4 (entidades y relaciones), Lección 12.2 (invariantes de dominio).
 
-### #155 — Asignación concurrente de barco devuelve 500 en vez de 409
+### #155 — Asignación concurrente de barco devuelve 500 en vez de 409 ✅ [PR #17](https://github.com/IgorDAM/Proyecto_CSharp/pull/17)
 
 - **Tipo:** Bug · **Puntos:** 2
 - **Problema:** `AmarreService.AssignBarcoAsync` comprueba con `FindByBarcoIdAsync` que el barco no tiene ya amarre y después actualiza. Si llegan dos peticiones a la vez que asignan el mismo barco a dos amarres distintos, **las dos pasan la comprobación**. La base de datos lo impide gracias al índice único sobre `Amarres.BarcoId` (está en la migración inicial), pero la segunda petición lanza una `DbUpdateException` que el middleware convierte en un **500**, cuando debería ser un **409 Conflict**.
