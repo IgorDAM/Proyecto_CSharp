@@ -9,6 +9,14 @@ using MarinaApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Validación del contenedor de DI fuera de producción: detecta dependencias
+// cautivas (un Singleton que recibe un Scoped) al arrancar, no en la primera petición.
+builder.Host.UseDefaultServiceProvider(options =>
+{
+    options.ValidateScopes = true;
+    options.ValidateOnBuild = !builder.Environment.IsProduction();
+});
+
 // ── Controladores ──
 // Equivalente a que Spring escanee automáticamente las clases @RestController.
 builder.Services.AddControllers();
