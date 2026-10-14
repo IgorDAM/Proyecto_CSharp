@@ -3803,6 +3803,16 @@ builder.Host.UseDefaultServiceProvider(o =>
 
 > 💡 **Tip:** `ValidateOnBuild` hace el arranque unos milisegundos más lento en apps grandes. Algunos equipos lo activan solo fuera de producción (`if (!builder.Environment.IsProduction())`). Lo que **no** debe pasar es que no esté activo en ningún entorno donde se ejecuten los tests de integración.
 
+> ⚠️ **Asignar `ValidateOnBuild` explícitamente pisa el valor por defecto.** `CreateBuilder` lo activa en Development y `UseDefaultServiceProvider` se aplica después: gana la última configuración. Por eso el operador importa. `o.ValidateOnBuild = builder.Environment.IsProduction();` (sin `!`) lo **apaga en Development** y lo enciende solo en producción, justo al revés de lo que dice el comentario. `IsDevelopment()` tampoco vale: deja sin validar `Staging` o `Local`. Lo correcto en MarinaApi:
+>
+> ```csharp
+> builder.Host.UseDefaultServiceProvider(options =>
+> {
+>     options.ValidateScopes  = true;
+>     options.ValidateOnBuild = !builder.Environment.IsProduction();
+> });
+> ```
+
 **2. Un test que falla si alguien lo introduce.** `WebApplicationFactory` arranca la aplicación en entorno Development, así que construir el contenedor ya ejecuta la validación:
 
 ```csharp
@@ -3821,6 +3831,24 @@ public class ContenedorDiTests : IClassFixture<WebApplicationFactory<Program>>
     }
 }
 ```
+
+**3. Comprueba que el test falla de verdad.** `Contenedor_NoTieneDependenciasCautivas` solo pasa **en verde**: no distingue «el contenedor está bien» de «la validación está apagada». Para que el test sirva hace falta un segundo, negativo, que meta una dependencia cautiva a propósito con `WithWebHostBuilder` y exija la excepción:
+
+```csharp
+[Fact]
+public void Contenedor_ConUnSingletonQueRecibeUnScoped_FallaAlConstruirse()
+{
+    var fabricaConCautiva = _factory.WithWebHostBuilder(builder =>
+        builder.ConfigureServices(services =>
+            services.AddSingleton<ICacheCautiva, CacheCautiva>()));   // CacheCautiva pide MarinaDbContext
+
+    var act = () => fabricaConCautiva.Services;
+
+    act.Should().Throw<Exception>().WithMessage("*Cannot consume scoped service*");
+}
+```
+
+Con la validación apagada, este test se pone rojo (`Expected a <System.Exception> to be thrown, but no exception was thrown`) mientras el positivo sigue verde. Ese contraste es lo que cazó el `!` olvidado del #161. Ver «Falso verde» en el glosario.
 
 > ⚠️ **Cuidado — lo que la validación NO detecta:**
 > - Un **Transient** capturado por un Singleton. No es un error para el contenedor, pero si ese Transient tiene estado o es `IDisposable`, tienes el mismo problema.

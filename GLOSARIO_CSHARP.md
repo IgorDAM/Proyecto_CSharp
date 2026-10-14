@@ -252,6 +252,23 @@ Para preguntar por el `null` en sí, el proyecto usa los patrones `is null` / `i
 
 ---
 
+### Property pattern (`{ Number: 1062 }`)
+
+**Qué es:** un patrón que comprueba, en una sola expresión, que un objeto es de cierto tipo **y** que algunas de sus propiedades valen lo que dices. Se escribe con llaves y `Propiedad: valor` dentro: `x is MySqlException { Number: 1062 }` significa «x es un `MySqlException` y su `Number` es 1062». Si `x` es `null` o de otro tipo, el resultado es `false`, sin excepción.
+
+**Equivalente en Java:** `x instanceof MySqlException e && e.getNumber() == 1062`. Java 21 tiene *record patterns*, pero solo para `record`; no hay una forma equivalente de comprobar propiedades de una clase normal dentro del propio patrón.
+
+**Ejemplo real (`AmarreRepository.UpdateAsync`, #155):**
+```csharp
+catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number: 1062 })
+{
+    throw new ConflictException($"El Barco con Id {entity.BarcoId} ya tiene asignado otro Amarre.");
+}
+```
+`ex.InnerException` es de tipo `Exception?` y puede ser `null`: el patrón cubre los tres casos (`null`, otro tipo, otro `Number`) sin `if` anidados. Junto con `when` (filtro de excepción, ver la Guía), el `catch` solo entra si la condición es `true`; si no, la excepción sigue subiendo con la pila intacta. En el #155 se probó quitando el `when`: el test que lanza un `DbUpdateException` sin `MySqlException` dentro se pone rojo, porque el `catch` se tragaría todos los errores.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
@@ -562,6 +579,24 @@ Con 20 barcos salían 21 consultas. Después del arreglo (PR #6), sale **1** sie
 **Cómo arreglarlo:**
 - **`Include`**, cuando necesitas los objetos relacionados enteros: los trae en la misma consulta.
 - **Proyección con `Select`**, cuando solo necesitas unos datos o un cálculo (un total, un contador). Es la opción preferible.
+
+---
+
+### Sin `Include` la colección queda vacía, sin error
+
+**Qué es:** EF Core **no hace lazy loading por defecto**. Una propiedad de navegación de tipo colección solo se rellena si la consulta la carga (`Include`) o si esa entidad ya estaba en el contexto. Si no, conserva el valor con el que la inicializó el constructor (`= new();` → lista vacía), **sin excepción ni aviso**. El código que opera sobre ella (`RemoveAll`, `Add`...) no falla, pero no hace nada útil, y `SaveChangesAsync` no detecta cambios (el *change tracker* no ve modificaciones), así que no se emite SQL. Resultado típico: un endpoint que responde `204` y no ha cambiado nada.
+
+**Equivalente en Java:** con Hibernate y `FetchType.LAZY`, acceder a la colección dentro de la sesión la carga; fuera, lanza `LazyInitializationException`. EF Core no hace ni una cosa ni la otra: calla. El remedio es el mismo que con `JOIN FETCH` (ver MIGRACION, 7.3): `Include()`.
+
+**Ejemplo real (#174, `DesinscribirBarcoAsync`):**
+```csharp
+// Mal: no carga barco.Regatas; RemoveAll sobre la lista vacía no hace nada
+var barco = await _barcoRepository.FindByIdAsync(barcoId, ct);
+
+// Bien: el mismo método que usa InscribirBarcoAsync, con Include(b => b.Regatas)
+var barco = await _barcoRepository.FindByIdWithRegatasAsync(barcoId, ct);
+```
+**Cómo se detecta:** con el log de SQL de la consola de la API. El `DELETE` mostraba dos `SELECT` simples, sin `JOIN` a `BarcoRegata` y sin escritura; el `POST` de inscribir sí tenía `LEFT JOIN BarcoRegata` + `INSERT`. **Cómo se previene:** un test que compruebe el **efecto** (la regata ya no está en `barco.Regatas`, o `Verify` sobre `UpdateAsync`) y no solo el código de estado.
 
 ---
 
@@ -915,6 +950,70 @@ await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
 **Cómo detectarlo:** escribir el test en rojo **antes** del arreglo (TDD) y comprobar que el rojo dice lo esperado. En el #174, el test nuevo se escribió con el barco existente a propósito: sin eso habría salido en verde desde el principio, por la `NotFoundException` del barco.
 
 **Relacionado (#174):** para afirmar que **no** pasa nada, `.Should().NotThrowAsync()` (`assertDoesNotThrow` en JUnit), y para comprobar el contenido de una colección, `barco.Regatas.Should().ContainSingle(r => r.Id == 2)`: exactamente un elemento y que cumple la condición (`assertThat(lista).singleElement().matches(...)` en AssertJ). Ver [[Guía definitiva de CSharp]] para el resto de aserciones.
+
+**Relacionado (#155, #161):** un verde que no has visto pasar antes por rojo no prueba nada. En el #155 el «verde» eran resultados antiguos del panel de tests (el helper estaba pegado en la clase equivocada y no compilaba, `CS0103`). En el #161 el test positivo `Contenedor_NoTieneDependenciasCautivas` salía verde con `ValidateOnBuild` apagado por un `!` olvidado; solo lo delató el test negativo, que mete a propósito una dependencia cautiva. Comprueba siempre el total de tests (`total: N`) y el resumen final, no solo el color.
+
+---
+
+### `WebApplicationFactory`, `IClassFixture` y `WithWebHostBuilder`
+
+**Qué es:** tres piezas para probar la aplicación **arrancada de verdad** dentro del proceso de test, sin abrir un puerto:
+- `WebApplicationFactory<Program>` (paquete `Microsoft.AspNetCore.Mvc.Testing`) ejecuta el `Program.cs` real. `.Services` da acceso al contenedor de DI y `.CreateClient()` a un `HttpClient` contra la API. Requiere que `Program` sea accesible (`public partial class Program`).
+- `IClassFixture<T>` (xUnit) crea **una** instancia de `T` por clase de tests y la inyecta en el constructor, para no arrancar la API en cada `[Fact]`.
+- `WithWebHostBuilder(...)` devuelve una **fábrica derivada** con cambios (servicios extra, configuración) sin tocar la original: lo que se registra ahí solo existe en ese test.
+
+**Equivalente en Java:** `@SpringBootTest` arranca el contexto real; Spring cachea el contexto entre tests con la misma configuración (el papel de `IClassFixture`); `@TestConfiguration` o `@MockBean` equivalen a `WithWebHostBuilder` + `ConfigureServices`.
+
+**Ejemplo real (#161, `ContenedorDiTests.cs`):**
+```csharp
+public class ContenedorDiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly WebApplicationFactory<Program> _factory;
+    public ContenedorDiTests(WebApplicationFactory<Program> factory) => _factory = factory;
+
+    [Fact]
+    public void Contenedor_ConUnSingletonQueRecibeUnScoped_FallaAlConstruirse()
+    {
+        var fabricaConCautiva = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddSingleton<ICacheCautiva, CacheCautiva>()));
+
+        var act = () => fabricaConCautiva.Services;   // construye el contenedor
+
+        act.Should().Throw<Exception>().WithMessage("*Cannot consume scoped service*");
+    }
+}
+```
+- Las clases de apoyo (`ICacheCautiva`, `CacheCautiva`) van `internal`: visibles solo dentro del proyecto de tests, que es el único que las usa (parecido a *package-private* en Java).
+- Este test arranca el `Program.cs` real, y ahí `ServerVersion.AutoDetect` se conecta a MySQL: **necesita el contenedor `marina-mysql` encendido** (lo resuelve el #177, tests de integración).
+
+---
+
+### `DbContext` de pruebas que falla al guardar (y `MySqlException` por reflexión)
+
+**Qué es:** el proveedor InMemory no produce errores de base de datos reales (ver «Lo que no prueba el proveedor InMemory»). Para probar código que **reacciona** a un fallo de la base de datos se hereda de `MarinaDbContext` y se sobrescribe `SaveChangesAsync` (es `virtual`) para que lance la excepción que se le pase. El test decide qué falla.
+
+Hay un segundo obstáculo: `MySqlException` (MySqlConnector 2.3.5) **no tiene constructores públicos**. Se crea por reflexión, llamando al constructor interno `(MySqlErrorCode, string)`. Alternativas: un *wrapper* propio o un test de integración contra MySQL real (#177).
+
+**Equivalente en Java:** `doThrow(new DataIntegrityViolationException("..."))` de Mockito sobre el repositorio. Allí la excepción de Spring sí tiene constructor público y no hace falta reflexión.
+
+**Ejemplo real (#155, `AmarreRepositoryTests.cs`):**
+```csharp
+internal class DbContextQueFallaAlGuardar : MarinaDbContext
+{
+    private readonly Exception _excepcion;
+    public DbContextQueFallaAlGuardar(DbContextOptions<MarinaDbContext> options, Exception excepcion)
+        : base(options) => _excepcion = excepcion;
+
+    public override Task<int> SaveChangesAsync(CancellationToken ct = default) => throw _excepcion;
+}
+
+private static MySqlException CrearMySqlException(MySqlErrorCode codigo, string mensaje) =>
+    (MySqlException)Activator.CreateInstance(
+        typeof(MySqlException), BindingFlags.NonPublic | BindingFlags.Instance,
+        binder: null, args: new object[] { codigo, mensaje }, culture: null)!;
+```
+Tres tests con este montaje: un 1062 → `ConflictException`; un `DbUpdateException` sin `MySqlException` dentro → sale tal cual; y un `MySqlException` 1213 (deadlock) → sale tal cual. Los dos últimos protegen el filtro `{ Number: 1062 }`: sin ellos, un `catch` demasiado ancho pasaría desapercibido.
 
 ---
 
