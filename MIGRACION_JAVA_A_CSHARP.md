@@ -1159,6 +1159,8 @@ public async Task<Barco?> FindByIdWithRegatasAsync(long id, CancellationToken ct
 
 `Include()` (y `ThenInclude()` para relaciones anidadas) es el equivalente exacto de `JOIN FETCH`: carga la relación en la **misma** consulta SQL, evitando el problema N+1 — el mismo problema de rendimiento que tu Cap. 8 no llegaba a mencionar explícitamente pero que `JOIN FETCH` prevenía.
 
+**Ojo: sin `Include` no hay error, hay silencio.** En Hibernate, una colección `LAZY` se carga al acceder a ella dentro de la sesión, o lanza `LazyInitializationException` fuera de ella. EF Core, sin `Include` y sin lazy loading (que no viene activado), deja la colección como la inicializó el constructor, normalmente vacía, y no lanza nada. Caso real (#174): `DesinscribirBarcoAsync` con `FindByIdAsync` en vez de `FindByIdWithRegatasAsync` respondía `204` y no desinscribía nada, porque `RemoveAll` actuaba sobre una lista vacía. Detalle en el glosario («Sin `Include` la colección queda vacía, sin error»).
+
 ## 7.4. Consultas derivadas por nombre (Spring Data) → simplemente no hacen falta
 
 Tu Cap. 11 mostraba cómo Spring Data generaba SQL a partir del **nombre del método** (`findByEsloraGreaterThan`). En C#, ese "truco" de nomenclatura no es necesario: **ya escribes directamente la expresión LINQ**, que es igual de concisa y además no depende de que aciertes con las palabras clave exactas (`GreaterThan`, `Containing`...) que Spring Data exige.
