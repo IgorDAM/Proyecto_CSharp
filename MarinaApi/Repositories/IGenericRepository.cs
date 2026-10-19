@@ -13,6 +13,18 @@ public interface IGenericRepository<T> where T : class
 {
     Task<T?> FindByIdAsync(long id, CancellationToken ct = default);
     Task<List<T>> FindAllAsync(CancellationToken ct = default);
+    /// <summary>
+    /// Devuelve una página de entidades y el total de filas de la tabla.
+    /// <paramref name="pagina"/> empieza en 1 (como ?pagina=1 en la URL).
+    /// Hace falta <paramref name="ordenarPor"/>: sin un ORDER BY, SQL no
+    /// garantiza el orden de las filas, y dos peticiones seguidas podrían
+    /// repetir u omitir elementos entre páginas.
+    /// </summary>
+    Task<(List<T> Elementos, int Total)> FindPageAsync(
+        Expression<Func<T, long>> ordenarPor,
+        int pagina,
+        int tamanio,
+        CancellationToken ct = default);
     Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default);
     Task<T> AddAsync(T entity, CancellationToken ct = default);
     Task UpdateAsync(T entity, CancellationToken ct = default);

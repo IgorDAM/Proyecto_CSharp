@@ -11,6 +11,16 @@ obj/
 
 # Archivos con contraseñas/secretos (no se comparten)
 contrasenas.txt
+.env
+_secrets.json
+_rotar_credenciales.sql
+_aplicar_seguridad.ps1
+_commit_msg.txt
+_api.log
+_api.err
+
+# Configuración local de Claude (no se comparte)
+.claude/settings.local.json
 
 # Archivos de paquetes y dependencias
 *.zip

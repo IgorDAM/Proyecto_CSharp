@@ -1,6 +1,6 @@
 # Arquitectura por capas — Marina API
 
-Documento vivo: qué hace cada capa del backend de MarinaApi, por qué existe y qué se ve desde el frontend cuando falla. Nace con el ticket #171 (frontend de solo lectura), cuyo objetivo real no son las tablas sino **entender cómo se conecta el frontend con el backend y la importancia de cada capa**. Se amplía con cada experimento; no se reescribe.
+Documento vivo: qué hace cada capa del backend de MarinaApi, por qué existe y qué se ve desde el frontend cuando falla. Nace con el ticket #179 (frontend de solo lectura), cuyo objetivo real no son las tablas sino **entender cómo se conecta el frontend con el backend y la importancia de cada capa**. Se amplía con cada experimento; no se reescribe.
 
 Relacionado: [[Guía definitiva de CSharp#Lección 11: Arquitectura de backend en capas|Lección 11 de la guía]] (teoría general) · [[Migración de Java a CSharp]] (equivalencias con Spring) · [[Glosario CSharp]] (términos sueltos).
 

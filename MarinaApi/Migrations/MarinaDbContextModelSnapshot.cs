@@ -210,7 +210,7 @@ namespace MarinaApi.Migrations
                     b.HasOne("MarinaApi.Models.Barco", "Barco")
                         .WithOne("Amarre")
                         .HasForeignKey("MarinaApi.Models.Amarre", "BarcoId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("Barco");
                 });

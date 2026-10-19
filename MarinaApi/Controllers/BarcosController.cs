@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace MarinaApi.Controllers;
 
@@ -25,11 +26,18 @@ public class BarcosController : ControllerBase
         _barcoService = barcoService;
     }
 
-    /// <summary>Lista todos los barcos.</summary>
+    /// <summary>
+    /// Lista los barcos paginados, ordenados por Id. La página empieza en 1;
+    /// el tamaño por defecto es 20 y el máximo 100.
+    /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<BarcoDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<BarcoDto>>> GetAll(CancellationToken ct) =>
-        Ok(await _barcoService.FindAllAsync(ct));
+    [ProducesResponseType(typeof(PaginaDto<BarcoDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginaDto<BarcoDto>>> GetAll(
+        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
+        [FromQuery, Range(1, 100)] int tamanio = 20,
+        CancellationToken ct = default) =>
+        Ok(await _barcoService.FindPageAsync(pagina, tamanio, ct));
 
     /// <summary>Busca un barco por su Id.</summary>
     [HttpGet("{id:long}")]

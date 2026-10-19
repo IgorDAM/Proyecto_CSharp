@@ -2,7 +2,7 @@ namespace MarinaApi.Dtos;
 
 /// <summary>
 ///
-/// BarcoNombre se añade (ticket #171, experimento 5) para que el frontend
+/// BarcoNombre se añade (ticket #179, experimento 5) para que el frontend
 /// muestre el nombre del barco sin un segundo fetch. Sigue sin meter el
 /// Barco completo: solo un dato plano, así que no reaparece el bucle.
 /// Es "string?" porque solo tiene valor si el Repository cargó la

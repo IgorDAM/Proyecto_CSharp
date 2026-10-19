@@ -19,14 +19,15 @@ Documento vivo: cada vez que pregunto por una palabra o un trozo de código que 
 
 ## Índice de temas
 
-- [[#Sintaxis CSharp]]
-- [[#.NET / ASP.NET Core]]
-- [[#Entity Framework Core]]
-- [[#LINQ]]
-- [[#SQL Server]]
-- [[#Testing (xUnit / Moq)]]
-- [[#Git / Azure DevOps]]
-- [[#Scrum / Metodología]]
+- [Sintaxis C#](#sintaxis-c)
+- [.NET / ASP.NET Core](#net--aspnet-core)
+- [Entity Framework Core](#entity-framework-core)
+- [LINQ](#linq)
+- [SQL Server](#sql-server)
+- [Testing (xUnit / Moq)](#testing-xunit--moq)
+- [Git / Azure DevOps](#git--azure-devops)
+- [Errores frecuentes (compilación y entorno)](#errores-frecuentes-compilación-y-entorno)
+- [Scrum / Metodología](#scrum--metodología)
 
 ---
 
@@ -201,7 +202,7 @@ Con un `int`, los dos casos darían `0`. Al salir por `??`, el compilador sabe q
 
 **Equivalente en Java:** `a != null ? a.getB() : null`, o `Optional.ofNullable(a).map(A::getB).orElse(null)`.
 
-**Ejemplo real (#171, experimento 5, `MarinaApi/Mapping/TripulanteMapper.cs`):**
+**Ejemplo real (#179, experimento 5, `MarinaApi/Mapping/TripulanteMapper.cs`):**
 ```csharp
 public static TripulanteDto ToDto(this Tripulante tripulante) =>
     new(tripulante.Id, tripulante.Nombre, tripulante.Rol, tripulante.BarcoId,
@@ -220,12 +221,83 @@ public static TripulanteDto ToDto(this Tripulante tripulante) =>
 
 **Equivalente en Java:** igual que en un `record` de Java o en un constructor: añadir un componente rompe todos los `new` que no lo pasen.
 
-**Ejemplo real (#171, experimento 5):** al añadir `string? BarcoNombre` a `TripulanteDto`, `dotnet build` falló en el Mapper:
+**Ejemplo real (#179, experimento 5):** al añadir `string? BarcoNombre` a `TripulanteDto`, `dotnet build` falló en el Mapper:
 ```
 error CS7036: No se ha dado ningún argumento que corresponda al parámetro
 requerido "BarcoNombre" de "TripulanteDto.TripulanteDto(long, string, string, long, string?)"
 ```
 El error es útil: el compilador señala todas las capas que construyen el DTO.
+
+### Argumentos con nombre
+
+**Qué es:** al llamar a un método se puede escribir el nombre del parámetro delante del valor: `metodo(nombre: valor)`. Así la llamada se lee sola y los argumentos se pueden pasar en cualquier orden. Se combina con los **parámetros opcionales** (`CancellationToken ct = default`), porque permite saltarse los opcionales intermedios.
+
+**Equivalente en Java:** no existe. En Java solo cuenta la posición, y para que una llamada con muchos parámetros se entienda se recurre a un *builder* o a sobrecargas.
+
+**Ejemplo real (migración `AmarreSetNullAlBorrarBarco`, #154):**
+```csharp
+migrationBuilder.AddForeignKey(
+    name: "FK_Amarres_Barcos_BarcoId",
+    table: "Amarres",
+    column: "BarcoId",
+    principalTable: "Barcos",
+    principalColumn: "Id",
+    onDelete: ReferentialAction.SetNull);
+```
+Sin los nombres serían seis valores seguidos, y habría que abrir la firma del método para saber cuál es cuál.
+
+---
+
+### partial class
+
+**Qué es:** una misma clase repartida entre varios archivos. Cada parte se declara con `partial` y el compilador las junta en una sola clase. Se usa sobre todo cuando una herramienta genera una parte del código y tú escribes la otra: así puedes regenerar la parte automática sin pisar la tuya.
+
+**Equivalente en Java:** no existe. En Java una clase pública vive en un único archivo. Lo más parecido es el código que genera Lombok, pero ese no se ve como archivo aparte.
+
+**Ejemplo real (#154):** cada migración de EF Core son dos archivos con la misma clase:
+```csharp
+// Migrations/20261005181450_AmarreSetNullAlBorrarBarco.cs: Up() y Down(), lo que se revisa
+public partial class AmarreSetNullAlBorrarBarco : Migration { ... }
+
+// Migrations/20261005181450_AmarreSetNullAlBorrarBarco.Designer.cs: generado, no se toca
+partial class AmarreSetNullAlBorrarBarco { ... }
+```
+
+---
+
+### Operadores con tipos anulables (lifted operators)
+
+**Qué es:** los operadores de un tipo de valor (`==`, `<`, `+`...) también funcionan con su versión anulable (`long?`, `int?`). C# los "eleva" (*lift*) y define qué pasa con el `null`:
+- `==` y `!=` comparan sin fallar: `null == 5` es `false` y `null == null` es `true`.
+- `<`, `>`, `<=` y `>=` devuelven `false` si algún lado es `null` (ojo: `null < 5` **y** `null > 5` son los dos `false`).
+- Los aritméticos propagan el `null`: `null + 1` es `null`.
+
+**Equivalente en Java:** con `Long a = null`, la expresión `a == 5L` obliga a hacer *unboxing* y lanza `NullPointerException`. En C# no hay excepción.
+
+**Ejemplo real (`AmarreService.AssignBarcoAsync`, #172):**
+```csharp
+// amarre.BarcoId es long? (puede ser null si el amarre está libre); dto.BarcoId es long
+if (amarre.BarcoId == dto.BarcoId)   // amarre libre → null == 7 → false, sin excepción
+    return amarre.ToDto();           // ya estaba asignado a ese barco: idempotente
+```
+Para preguntar por el `null` en sí, el proyecto usa los patrones `is null` / `is not null`.
+
+---
+
+### Property pattern (`{ Number: 1062 }`)
+
+**Qué es:** un patrón que comprueba, en una sola expresión, que un objeto es de cierto tipo **y** que algunas de sus propiedades valen lo que dices. Se escribe con llaves y `Propiedad: valor` dentro: `x is MySqlException { Number: 1062 }` significa «x es un `MySqlException` y su `Number` es 1062». Si `x` es `null` o de otro tipo, el resultado es `false`, sin excepción.
+
+**Equivalente en Java:** `x instanceof MySqlException e && e.getNumber() == 1062`. Java 21 tiene *record patterns*, pero solo para `record`; no hay una forma equivalente de comprobar propiedades de una clase normal dentro del propio patrón.
+
+**Ejemplo real (`AmarreRepository.UpdateAsync`, #155):**
+```csharp
+catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number: 1062 })
+{
+    throw new ConflictException($"El Barco con Id {entity.BarcoId} ya tiene asignado otro Amarre.");
+}
+```
+`ex.InnerException` es de tipo `Exception?` y puede ser `null`: el patrón cubre los tres casos (`null`, otro tipo, otro `Number`) sin `if` anidados. Junto con `when` (filtro de excepción, ver la Guía), el `catch` solo entra si la condición es `true`; si no, la excepción sigue subiendo con la pila intacta. En el #155 se probó quitando el `when`: el test que lanza un `DbUpdateException` sin `MySqlException` dentro se pone rojo, porque el `catch` se tragaría todos los errores.
 
 ---
 
@@ -369,10 +441,28 @@ El `= default` en la firma significa "si no me pasas token, usa `CancellationTok
 
 **Equivalente en Java:** la carpeta `src/main/resources/static/` de Spring Boot, que se sirve sola; el orden de los middlewares es como el orden de los `Filter` de la cadena de Servlets.
 
-**Ejemplo real (#171, `MarinaApi/Program.cs`):**
+**Ejemplo real (#179, `MarinaApi/Program.cs`):**
 ```csharp
 app.UseDefaultFiles();   // "/" → "/index.html"
 app.UseStaticFiles();    // sirve el archivo de wwwroot
+
+### User secrets
+
+**Qué es:** un almacén de configuración **fuera del repo**, por proyecto y por usuario, pensado para guardar contraseñas y claves en desarrollo. Vive en `%APPDATA%\Microsoft\UserSecrets\<UserSecretsId>\secrets.json`, y el `<UserSecretsId>` se declara en el `.csproj`. En Development, `WebApplication.CreateBuilder()` lo carga automáticamente **encima** de `appsettings.json`: si la misma clave está en los dos sitios, gana user-secrets.
+
+**Equivalente en Java/Spring:** un `application-local.properties` metido en `.gitignore`, o variables de entorno. La diferencia es que aquí el archivo ni siquiera está dentro de la carpeta del proyecto, así que es imposible subirlo a git por error.
+
+**Ojo:** no cifra nada, solo saca el secreto del repo. En producción se usan variables de entorno o un almacén real (Azure Key Vault, AWS Secrets Manager).
+
+**Ejemplo (real del proyecto, corrección de seguridad del 2026-09-30):**
+```powershell
+# La cadena de conexión con contraseña ya no está en appsettings.json
+dotnet user-secrets set "ConnectionStrings:MarinaDb" "Server=localhost;Port=3306;Database=gestion_maritima;User=marina_app;Password=..." --project .\MarinaApi
+dotnet user-secrets list --project .\MarinaApi
+```
+```csharp
+// Program.cs — se lee igual que antes: la configuración ya mezcla las fuentes
+var connectionString = builder.Configuration.GetConnectionString("MarinaDb");
 ```
 
 ---
@@ -383,7 +473,7 @@ app.UseStaticFiles();    // sirve el archivo de wwwroot
 
 **Equivalente en Java:** Jackson ya usa camelCase porque en Java los getters (`getBarcoNombre`) se traducen así; en C# es una conversión explícita del serializador.
 
-**Ejemplo real (#171):** en JavaScript hay que escribir `tripulante.barcoNombre`. Si escribes mal el nombre (`regata.barcosInscritos` en vez de `totalBarcosInscritos`), JS no avisa: devuelve `undefined`.
+**Ejemplo real (#179):** en JavaScript hay que escribir `tripulante.barcoNombre`. Si escribes mal el nombre (`regata.barcosInscritos` en vez de `totalBarcosInscritos`), JS no avisa: devuelve `undefined`.
 
 ---
 
@@ -393,7 +483,7 @@ app.UseStaticFiles();    // sirve el archivo de wwwroot
 
 **Equivalente en Java:** en Spring, `@GetMapping("/{id}")` con `Long id` sí entra en el mapping y falla al convertir: da un **400** (`MethodArgumentTypeMismatchException`). Sin la restricción `:long`, .NET también llegaría al Controller y el model binding daría un 400.
 
-**Ejemplo real (#171, experimento 4):** `GET /api/regatas/abc` → 404 con el cuerpo vacío, igual que una URL que no existe (`/api/regatasXX`).
+**Ejemplo real (#179, experimento 4):** `GET /api/regatas/abc` → 404 con el cuerpo vacío, igual que una URL que no existe (`/api/regatasXX`).
 
 ---
 
@@ -403,11 +493,89 @@ app.UseStaticFiles();    // sirve el archivo de wwwroot
 
 **Equivalente en Java:** la clase `ProblemDetail` de Spring 6, devuelta desde un `@ControllerAdvice` con `@ExceptionHandler`.
 
-**Ejemplo real (#171, experimento 4, `MarinaApi/Middleware/ExceptionHandlingMiddleware.cs`):** `GET /api/regatas/9999` → el Service lanza `NotFoundException`, el middleware la captura y responde:
+**Ejemplo real (#179, experimento 4, `MarinaApi/Middleware/ExceptionHandlingMiddleware.cs`):** `GET /api/regatas/9999` → el Service lanza `NotFoundException`, el middleware la captura y responde:
 ```json
 {"type":"https://httpstatuses.com/404","title":"NotFound","status":404,"detail":"Regata con Id 9999 no encontrado."}
 ```
 Un 404 de ruta inexistente, en cambio, llega con el cuerpo vacío: en el frontend no todo error trae JSON, así que hay que mirar `respuesta.ok` antes de hacer `respuesta.json()`.
+
+### Autenticación JWT Bearer (AddJwtBearer y dotnet user-jwts)
+
+**Qué es:** el cliente manda en cada petición la cabecera `Authorization: Bearer <token>`, donde el token es un JWT firmado. `AddJwtBearer()` registra el *handler* que comprueba la firma, el emisor (`iss`), la audiencia (`aud`) y la caducidad. Si todo cuadra, rellena `HttpContext.User`; si no, la petición llega sin usuario y la autorización la rechaza con **401**.
+
+**Equivalente en Java/Spring:** Spring Security con `oauth2ResourceServer().jwt()` y `spring.security.oauth2.resourceserver.jwt.issuer-uri`.
+
+**`dotnet user-jwts`:** herramienta de desarrollo (.NET 7+) que emite tokens de prueba sin necesidad de un servidor de identidad. `dotnet user-jwts create` guarda la clave de firma en user-secrets, escribe el emisor y las audiencias válidas en `appsettings.Development.json` y muestra el token. Por eso `AddJwtBearer()` funciona **sin opciones**: lee todo de la sección `Authentication:Schemes:Bearer`.
+
+**Ejemplo (real del proyecto):**
+```csharp
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer();
+// ...
+app.UseAuthentication();   // 1º: ¿quién eres? (lee el token)
+app.UseAuthorization();    // 2º: ¿puedes entrar?
+```
+```powershell
+dotnet user-jwts create --project .\MarinaApi --name igor   # genera un token nuevo
+dotnet user-jwts list   --project .\MarinaApi               # los ya emitidos
+```
+En Swagger: botón **Authorize**, se pega el token **sin** el prefijo `Bearer`.
+
+**Un JWT está firmado, no cifrado.** Sus tres partes (cabecera, contenido y firma) van en Base64URL: cualquiera que tenga el token puede leer su contenido, por ejemplo en jwt.io. La firma solo garantiza que nadie lo ha modificado. Por eso no se meten datos sensibles en un JWT, y un token **no se pega** en chats, tickets ni capturas: mientras no caduque, quien lo tenga puede usarlo.
+
+---
+
+### FallbackPolicy, [Authorize] y [AllowAnonymous]
+
+**Qué es:** `[Authorize]` exige un usuario autenticado en un controlador o en una acción concreta. La **FallbackPolicy** es la política que se aplica a todo endpoint que *no* tiene ningún atributo de autorización. Si se configura como "requiere usuario autenticado", la API queda **cerrada por defecto** y hay que abrir explícitamente con `[AllowAnonymous]` lo que deba ser público.
+
+**Equivalente en Java/Spring:** `.anyRequest().authenticated()` al final de la configuración de `HttpSecurity`, con `.requestMatchers(...).permitAll()` como equivalente de `[AllowAnonymous]`.
+
+**Por qué FallbackPolicy y no `[Authorize]` en cada controlador:** si mañana se crea un controlador nuevo y se olvida el atributo, con `[Authorize]` quedaría abierto; con la FallbackPolicy queda protegido. Un fallo de este tipo se corrige añadiendo `[AllowAnonymous]`, nunca dejando datos expuestos sin querer.
+
+**Lo que NO cubre:** Swagger (`UseSwagger`) y los archivos estáticos (`UseStaticFiles`) son middleware, no endpoints de controlador, así que la FallbackPolicy no les afecta.
+
+**Ejemplo (real del proyecto):**
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+```
+```csharp
+// Así se abriría un endpoint concreto (p.ej. para el frontend de #171)
+[AllowAnonymous]
+[HttpGet]
+public async Task<ActionResult<List<BarcoDto>>> GetAll(CancellationToken ct) => ...
+```
+
+---
+
+### CORS
+
+**Qué es:** *Cross-Origin Resource Sharing*. El **navegador** bloquea que una web de un origen (esquema + dominio + puerto) lea respuestas de otro origen, salvo que el servidor lo autorice con cabeceras `Access-Control-Allow-*`. Solo afecta a navegadores: Postman, `curl` o un backend no lo aplican. No sustituye a la autenticación; sirve para impedir que *otra web* use el navegador del usuario contra tu API.
+
+**Equivalente en Java/Spring:** `@CrossOrigin` o un `CorsConfigurationSource` con `setAllowedOrigins(...)`.
+
+**El error que tenía el proyecto:** `AllowAnyOrigin()` permitía que cualquier página abierta en el navegador llamara a la API en `localhost`, incluidos los `DELETE`. Ahora se usa una lista blanca configurable. Un frontend servido **desde la propia API** (`wwwroot`, rama #171) es el mismo origen, así que no necesita CORS.
+
+**Ejemplo (real del proyecto):**
+```csharp
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? Array.Empty<string>();
+
+builder.Services.AddCors(options =>
+    options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(allowedOrigins)
+              .WithMethods("GET", "POST", "PUT", "PATCH", "DELETE")
+              .WithHeaders("Authorization", "Content-Type")));
+```
+```json
+// appsettings.json — vacío = ningún origen externo permitido
+"Cors": { "AllowedOrigins": [] }
+```
 
 ---
 
@@ -495,7 +663,7 @@ Con 20 barcos salían 21 consultas. Después del arreglo (PR #6), sale **1** sie
 
 **Equivalente en Java:** `Include` es el `JOIN FETCH` de JPQL. La diferencia está en el valor por defecto: en JPA, `@ManyToOne` es EAGER, así que Hibernate trae el objeto relacionado sin pedírselo (y a menudo provoca N+1).
 
-**Ejemplo real (#171, experimento 5, `MarinaApi/Repositories/TripulanteRepository.cs`):**
+**Ejemplo real (#179, experimento 5, `MarinaApi/Repositories/TripulanteRepository.cs`):**
 ```csharp
 public async Task<List<Tripulante>> FindAllWithBarcoAsync(CancellationToken ct = default) =>
     await _context.Tripulantes
@@ -505,6 +673,82 @@ public async Task<List<Tripulante>> FindAllWithBarcoAsync(CancellationToken ct =
 Sin el `Include`, el JSON traía `barcoNombre: null`. Con él, el log muestra `INNER JOIN Barcos`.
 
 **Coste:** `Include` trae **todas** las columnas de la tabla relacionada (`Capacidad`, `Eslora`, `Manga`...) aunque solo se use una. Si solo hace falta un dato, es mejor una proyección (ver Proyección a DTO con Select, en Entity Framework Core).
+
+### Sin `Include` la colección queda vacía, sin error
+
+**Qué es:** EF Core **no hace lazy loading por defecto**. Una propiedad de navegación de tipo colección solo se rellena si la consulta la carga (`Include`) o si esa entidad ya estaba en el contexto. Si no, conserva el valor con el que la inicializó el constructor (`= new();` → lista vacía), **sin excepción ni aviso**. El código que opera sobre ella (`RemoveAll`, `Add`...) no falla, pero no hace nada útil, y `SaveChangesAsync` no detecta cambios (el *change tracker* no ve modificaciones), así que no se emite SQL. Resultado típico: un endpoint que responde `204` y no ha cambiado nada.
+
+**Equivalente en Java:** con Hibernate y `FetchType.LAZY`, acceder a la colección dentro de la sesión la carga; fuera, lanza `LazyInitializationException`. EF Core no hace ni una cosa ni la otra: calla. El remedio es el mismo que con `JOIN FETCH` (ver MIGRACION, 7.3): `Include()`.
+
+**Ejemplo real (#174, `DesinscribirBarcoAsync`):**
+```csharp
+// Mal: no carga barco.Regatas; RemoveAll sobre la lista vacía no hace nada
+var barco = await _barcoRepository.FindByIdAsync(barcoId, ct);
+
+// Bien: el mismo método que usa InscribirBarcoAsync, con Include(b => b.Regatas)
+var barco = await _barcoRepository.FindByIdWithRegatasAsync(barcoId, ct);
+```
+**Cómo se detecta:** con el log de SQL de la consola de la API. El `DELETE` mostraba dos `SELECT` simples, sin `JOIN` a `BarcoRegata` y sin escritura; el `POST` de inscribir sí tenía `LEFT JOIN BarcoRegata` + `INSERT`. **Cómo se previene:** un test que compruebe el **efecto** (la regata ya no está en `barco.Regatas`, o `Verify` sobre `UpdateAsync`) y no solo el código de estado.
+
+---
+
+### OnDelete y DeleteBehavior: qué pasa al borrar el principal
+
+**Qué es:** `.OnDelete(DeleteBehavior.X)` decide qué les pasa a los **dependientes** (las filas que tienen la FK) cuando se borra el **principal**. Va siempre en ese sentido, del principal al dependiente, aunque configures la relación desde cualquiera de los dos lados. Hace dos cosas:
+1. Dice qué hace EF Core con las entidades que tiene cargadas en memoria (*tracked*).
+2. Escribe la cláusula `ON DELETE ...` de la FK cuando se genera la migración. A partir de ahí la regla la aplica **la base de datos**, aunque el borrado venga de Workbench o de otro programa.
+
+| `DeleteBehavior` | En la base de datos | Uso típico |
+|---|---|---|
+| `Cascade` | `ON DELETE CASCADE` | El dependiente no tiene sentido sin el principal. **Por defecto en relaciones obligatorias** (FK no anulable) |
+| `SetNull` | `ON DELETE SET NULL` | El dependiente sobrevive sin el principal. Necesita la FK anulable |
+| `ClientSetNull` | `NO ACTION` | **Por defecto en relaciones opcionales** (FK anulable). EF pone `null` solo en lo que tiene cargado; si el dependiente no está cargado, la BD rechaza el borrado |
+| `Restrict` / `NoAction` | `RESTRICT` / `NO ACTION` | Prohibido borrar el principal si tiene dependientes |
+| `ClientCascade` | `NO ACTION` | EF borra en cascada solo lo que tiene cargado (lo más parecido a la cascada de JPA) |
+
+**Equivalente en Java:** `cascade = CascadeType.REMOVE` (o `ALL`) y `orphanRemoval` los ejecuta **Hibernate en memoria**, y solo si el borrado pasa por él; no cambian el esquema. Lo que se parece de verdad a `OnDelete` es la anotación `@OnDelete(action = OnDeleteAction.CASCADE)` de Hibernate (`SET_NULL` desde Hibernate 6.2), que sí escribe el `ON DELETE` en la tabla.
+
+**Ejemplo real (#154, `MarinaApi/Data/MarinaDbContext.cs`):**
+```csharp
+modelBuilder.Entity<Amarre>()
+    .HasOne(a => a.Barco)
+    .WithOne(b => b.Amarre)
+    .HasForeignKey<Amarre>(a => a.BarcoId)   // la FK está en Amarre: Amarre es el dependiente
+    .OnDelete(DeleteBehavior.SetNull);       // antes era Cascade: borrar un barco borraba su amarre
+```
+El bug del #154 venía de pensar en JPA ("cascada desde Barco hacia Amarre = `CascadeType.ALL`"). En EF Core, `Cascade` borra **el lado que tiene la FK**, que aquí era el amarre: justo el que tenía que sobrevivir. Tabla corregida en [[Migración de Java a CSharp#4.4. Cascade — misma idea, sintaxis distinta]].
+
+---
+
+### Los archivos de una migración
+
+**Qué es:** `dotnet ef migrations add <Nombre>` compara el modelo actual (`OnModelCreating` y las entidades) con `MarinaDbContextModelSnapshot.cs`, que guarda cómo era el modelo en la última migración. Con la diferencia crea o toca tres archivos:
+
+| Archivo | Para qué sirve | ¿Se revisa? |
+|---|---|---|
+| `<fecha>_<Nombre>.cs` | `Up()` aplica el cambio y `Down()` lo deshace | **Sí, siempre**, antes de aplicarla |
+| `<fecha>_<Nombre>.Designer.cs` | Foto del modelo completo en ese momento (`partial class`) | No, es generado |
+| `MarinaDbContextModelSnapshot.cs` | El modelo "actual", con el que se comparará la próxima migración | No, pero se commitea con la migración |
+
+**Equivalente en Java:** es como un changeset de Flyway o Liquibase (`V2__...sql`), pero escrito automáticamente a partir de las entidades. No es `ddl-auto=update`: MySQL no se toca hasta lanzar `dotnet ef database update`, que además apunta la migración en la tabla `__EFMigrationsHistory` (el `flyway_schema_history` de Flyway).
+
+**Ejemplo real (#154):** cambiar la acción de una FK genera un `DropForeignKey` seguido de un `AddForeignKey`, porque ningún motor permite modificar una FK en el sitio. Para ver el SQL exacto antes de aplicarlo:
+```powershell
+dotnet ef migrations script InitialCreate AmarreSetNullAlBorrarBarco --project .\MarinaApi
+```
+**Por qué revisar `Up()`:** si renombras una propiedad, EF Core a veces genera `DropColumn` + `AddColumn` en lugar de `RenameColumn`, y esa columna pierde los datos sin ningún aviso.
+
+---
+
+### En MySQL el DDL no es transaccional
+
+**Qué es:** en MySQL, cada sentencia DDL (`CREATE`, `ALTER`, `DROP`...) hace un **commit implícito**: no se puede deshacer con un `ROLLBACK`. Si una migración tiene dos `ALTER TABLE` y falla el segundo, el primero ya se ha quedado aplicado, y la migración no consta en `__EFMigrationsHistory`. Hay que arreglarlo a mano.
+
+**Diferencia entre motores:** en **PostgreSQL** y **SQL Server** el DDL sí es transaccional: si algo falla, se deshace toda la migración. Es una de las diferencias reales al pasar de SQL Server a MySQL.
+
+**Equivalente en Java:** igual con Flyway sobre MySQL. Su documentación avisa de que en MySQL una migración fallida a medias deja el esquema en un estado intermedio.
+
+**Ejemplo real (#154):** el script de `AmarreSetNullAlBorrarBarco` acaba en `COMMIT`, pero entre el `DROP FOREIGN KEY` y el `ADD CONSTRAINT` ya ha habido un commit. Si fallara el segundo, la tabla `Amarres` se quedaría **sin FK**. Por eso, en un entorno real, el script se revisa antes (`migrations script --idempotent`) en lugar de lanzar `database update` a ciegas.
 
 ---
 
@@ -625,6 +869,246 @@ Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 
 ---
 
+### FluentAssertions: `.Should()`
+
+**Qué es:** la librería de asserts del proyecto (`FluentAssertions` 6.12 en `MarinaApi.Tests.csproj`). `Should()` es un *extension method* (ver Extension methods, en Sintaxis C#) que se "pega" a cualquier valor y devuelve un objeto con los asserts propios de su tipo. Se lee como una frase: *"resultado.BarcoId debería ser 5"*.
+
+**Equivalente en Java:** AssertJ, casi uno a uno: `assertThat(x).isEqualTo(5)` ↔ `x.Should().Be(5)`.
+
+| FluentAssertions | AssertJ | Para qué |
+|---|---|---|
+| `x.Should().Be(5)` | `assertThat(x).isEqualTo(5)` | igualdad |
+| `x.Should().BeNull()` / `NotBeNull()` | `isNull()` / `isNotNull()` | nulos |
+| `lista.Should().HaveCount(3)` | `hasSize(3)` | tamaño |
+| `lista.Should().BeEmpty()` | `isEmpty()` | vacía |
+| `lista.Should().OnlyContain(t => t.BarcoNombre == "Aurora")` | `allMatch(...)` | todos cumplen |
+| `dto.Should().BeEquivalentTo(esperado)` | `usingRecursiveComparison().isEqualTo(...)` | compara propiedad a propiedad |
+
+**Por qué se usa en vez de `Assert.Equal` de xUnit:** el mensaje de error dice qué expresión falló y con qué valor. `Assert.Equal(5, resultado.BarcoId)` falla con `Expected: 5, Actual: 7`; `resultado.BarcoId.Should().Be(5)` falla con `Expected resultado.BarcoId to be 5, but found 7`.
+
+**Ojo con la versión:** desde la v8 (enero de 2025), FluentAssertions es de pago para uso comercial. El proyecto usa la 6.12, que sigue siendo gratuita. En una empresa conviene preguntar qué versión o alternativa usan (por ejemplo, Shouldly, o los `Assert` de xUnit).
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):**
+```csharp
+resultado.BarcoId.Should().Be(5);
+amarre.BarcoId.Should().Be(7);   // #172: el barco que ya estaba no se ha tocado
+```
+
+---
+
+### `FluentActions.Awaiting(...)` y `.Should().ThrowAsync<T>()`
+
+**Qué es:** la forma de FluentAssertions de comprobar que un método **async** lanza una excepción. Se lee de dentro afuera:
+
+1. **`() => _service.AssignBarcoAsync(1, dto)`**: una lambda que *todavía no se ejecuta*. Es la "acción" que se quiere probar, envuelta para que el assert decida cuándo lanzarla y pueda capturar lo que salga.
+2. **`FluentActions.Awaiting(lambda)`**: marca esa acción como asíncrona (algo que hay que esperar con `await`). Para un método **síncrono**, el equivalente es `FluentActions.Invoking(() => ...)`.
+3. **`.Should().ThrowAsync<ConflictException>()`**: ejecuta la acción, la espera y comprueba que termina con esa excepción (o una clase hija; para el tipo exacto, `ThrowExactlyAsync<T>()`). Si no lanza nada, o lanza otra cosa, el test falla.
+4. **`await` delante de todo**: `ThrowAsync` devuelve un `Task`, y el assert ocurre *dentro* de ese `Task`.
+
+**Equivalente en Java:**
+```java
+// JUnit 5
+assertThrows(ConflictException.class, () -> service.assignBarco(1L, dto));
+// AssertJ
+assertThatThrownBy(() -> service.assignBarco(1L, dto)).isInstanceOf(ConflictException.class);
+```
+En Java no hace falta el `Awaiting` ni el `await` porque el método es síncrono. En C# el método devuelve un `Task`, y la excepción "viaja" dentro de él hasta que alguien lo espera.
+
+**⚠️ La trampa:** si se olvida el `await` del principio, el test **pasa siempre**, lance o no la excepción. El `Task` con el assert se crea, nadie lo espera, y el test termina antes de comprobar nada. Es un test que no puede fallar. El compilador avisa con el warning **CS4014**: no lo ignores.
+
+**Extras útiles:**
+```csharp
+// Comprobar también el mensaje (* = comodín)
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().ThrowAsync<ConflictException>()
+    .WithMessage("*ya tiene asignado*");
+
+// Comprobar que NO lanza nada
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().NotThrowAsync();
+```
+
+**Alternativa sin FluentAssertions (xUnit puro):** `await Assert.ThrowsAsync<ConflictException>(() => _service.AssignBarcoAsync(1, dto));`. Ojo: esta exige el tipo **exacto**, no acepta clases hijas.
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`, #172):**
+```csharp
+await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
+    .Should().ThrowAsync<ConflictException>();
+```
+
+---
+
+### `Times` en `Verify` (Moq)
+
+**Qué es:** el segundo argumento de `Verify` dice **cuántas veces** debía haberse llamado al método:
+
+| Moq | Mockito | Significado |
+|---|---|---|
+| `Times.Never` | `never()` | ninguna |
+| `Times.Once` | `times(1)` | exactamente una |
+| `Times.Exactly(3)` | `times(3)` | exactamente 3 |
+| `Times.AtLeastOnce` | `atLeastOnce()` | 1 o más |
+| `Times.AtMost(2)` | `atMost(2)` | 2 o menos |
+| `Times.Between(1, 3, Range.Inclusive)` | — | entre 1 y 3 |
+
+**⚠️ Diferencia con Mockito:** sin segundo argumento, `mock.Verify(r => r.UpdateAsync(...))` significa **al menos una vez** (`AtLeastOnce`), mientras que en Mockito `verify(mock).update(...)` significa **exactamente una** (`times(1)`). Para no depender de eso, en el proyecto se escribe siempre el `Times` explícito.
+
+**Para qué sirve `Times.Never`:** comprobar que un camino de error **corta antes** de hacer efectos. En el #172 no basta con que lance `ConflictException`: además, `UpdateAsync` no debe llamarse, para que no se guarde nada en la base de datos.
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):**
+```csharp
+_amarreRepositoryMock.Verify(r => r.UpdateAsync(amarre, It.IsAny<CancellationToken>()), Times.Once);    // caso feliz
+_amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<CancellationToken>()), Times.Never);  // errores
+```
+
+---
+
+### `MockBehavior`: mock *loose* frente a *strict* (Moq)
+
+**Qué es:** cómo reacciona un mock cuando se llama a un método **sin `Setup`**:
+- **`Loose`** (por defecto, `new Mock<T>()`): no protesta; devuelve el valor por defecto del tipo (`null`, `0`, `false`). Si el método devuelve `Task<T>`, devuelve un `Task` ya terminado con `default(T)`, normalmente `null`.
+- **`Strict`** (`new Mock<T>(MockBehavior.Strict)`): cualquier llamada sin `Setup` lanza `MockException`. Obliga a configurar exactamente lo que el código va a usar.
+
+**Equivalente en Java (Mockito):** un mock de Mockito también es *loose* para las llamadas sin configurar: devuelve `null`, `0` o una colección vacía. La "strictness" de Mockito (`STRICT_STUBS`, por defecto con `MockitoExtension`) es otra cosa: avisa de los `when(...)` que **no se usaron**. No hay un equivalente directo a `MockBehavior.Strict`.
+
+**Por qué el proyecto usa `Loose`:**
+- En el test del #172 se configuran `ExistsAsync` y `FindByBarcoIdAsync` aunque el servicio corte antes de llamarlos. Con `Loose` no molestan, y el test no depende del orden de las comprobaciones.
+- Con `Strict` cada test se rompería al reordenar el código del servicio, aunque el comportamiento fuera el mismo (tests "frágiles").
+
+**La trampa de `Loose`:** un método que se olvidó configurar devuelve `null` en silencio, y el fallo aparece lejos de la causa (un `NullReferenceException` en el servicio, o un test que falla sin motivo aparente). Pasó en el #171 con `FindAllAsync_MapeaTodasLasEntidadesADto`: el servicio empezó a llamar a `FindAllWithBarcoAsync`, que no tenía `Setup`, y Moq devolvía `null`.
+
+---
+
+### Cast de `null` en `ReturnsAsync`: `(Amarre?)null`
+
+**Qué es:** `ReturnsAsync` tiene varias sobrecargas: una recibe el **valor** a devolver y otras reciben una **función** que lo calcula. Un `null` a secas encaja en todas, así que el compilador no sabe cuál elegir y da el error **CS0121** (*"The call is ambiguous between..."*). El cast le da un tipo concreto y elige la sobrecarga de "valor".
+
+**Equivalente en Java:** en Mockito `thenReturn(null)` funciona sin cast, porque no hay sobrecargas que compitan de la misma forma. El concepto es el mismo que cuando en Java se escribe `metodo((String) null)` para deshacer una ambigüedad entre `metodo(String)` y `metodo(Integer)`.
+
+**Formas equivalentes:**
+```csharp
+.ReturnsAsync((Amarre?)null);     // la que usa el proyecto
+.ReturnsAsync(default(Amarre));   // default de un tipo por referencia = null
+```
+
+**Ejemplo real (`AssignBarcoServiceTests.cs`):** "el barco no tiene ningún amarre todavía":
+```csharp
+_amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationToken>()))
+    .ReturnsAsync((Amarre?)null);
+```
+
+---
+
+### Lo que no prueba el proveedor InMemory
+
+**Qué es:** `UseInMemoryDatabase` guarda las entidades en memoria, sin SQL ni base de datos real. Es rápido para tests, pero:
+- **No soporta transacciones.** `BeginTransactionAsync` lanza un error, salvo que se ignore el aviso `TransactionIgnoredWarning`. Por eso `RegataService.DeleteAsync` se quedó sin test en el #152.
+- **No traduce a SQL.** Una consulta LINQ que MySQL no sabría ejecutar puede pasar en InMemory.
+- **No tiene restricciones de la BD.** No aplica `ON DELETE`, FKs ni índices únicos: solo lo que hace EF en memoria.
+
+**Equivalente en Java:** H2 en modo memoria en los tests de Spring. Con H2 se ejecuta SQL de verdad, pero en otro dialecto, así que también puede dar falsos verdes. La alternativa seria en los dos mundos es **Testcontainers** con el motor real (MySQL).
+
+**Regla del proyecto:** un unit test con el repositorio mockeado prueba la lógica del Service, no la consulta. La consulta y el esquema (como el `ON DELETE SET NULL` del #154) se verifican contra MySQL: a mano en Swagger o con un test de integración.
+
+---
+
+### Mutation testing (la idea)
+
+**Qué es:** una forma de comprobar si los tests sirven. Se cambia el código adrede (se invierte un `if`, un `==` pasa a `!=`, se borra una línea...) y se lanzan los tests. Si alguno se pone en rojo, el "mutante" ha muerto y los tests vigilan esa línea. Si todos siguen en verde, esa línea podría estar mal y nadie se daría cuenta.
+
+**Herramientas:** **Stryker.NET** en .NET y **PIT** (pitest) en Java. Generan los mutantes automáticamente y dan un porcentaje de "mutantes muertos", mucho más fiable que la cobertura de líneas.
+
+**Ejemplo real (#172, a mano):** Igor movió el `if` idempotente de `AssignBarcoAsync` al final del método, y el test `CuandoElMismoBarcoYaEstaEnEseAmarre` se puso en rojo (lo cazaba el `if` de "amarre ocupado"). Ese test mata ese mutante.
+
+---
+
+### Falso verde: un test que pasa por la razón equivocada
+
+**Qué es:** un test que sale en verde aunque el código que dice probar esté mal, porque la condición que comprueba se cumple por otro motivo. Es peor que un test en rojo: da una seguridad que no existe. Con mocks *loose* es fácil caer en él, porque todo lo que no tiene `Setup` devuelve `null`/`false`/`0` sin avisar, y eso puede provocar la misma excepción que esperabas por otro camino.
+
+**Equivalente en Java:** igual con Mockito, que también devuelve `null`/`false` por defecto. Un `assertThrows(NotFoundException.class, ...)` sin mirar el mensaje tiene el mismo riesgo.
+
+**Ejemplo real (#174, `RegataServiceTests.cs`):** al añadir `ExistsAsync` de la regata a `DesinscribirBarcoAsync`, el test `CuandoBarcoNoExiste_LanzaNotFoundException` **siguió en verde**, pero ahora la `NotFoundException` era de la regata (el mock devolvía `false` en `ExistsAsync`), no del barco. Si alguien hubiera borrado la comprobación del barco, el test no se habría enterado.
+
+**Dos defensas:**
+1. **En cada test de error, existe todo menos lo que se prueba.** Si el test es "el barco no existe", la regata tiene que existir (`ExistsAsync → true`). Así el error solo puede venir de un sitio.
+2. **Comprobar el mensaje, no solo el tipo:**
+```csharp
+await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
+    .Should().ThrowAsync<NotFoundException>()
+    .WithMessage("*Barco*999*");   // * = comodín; en AssertJ, hasMessageContaining("Barco")
+```
+
+**Cómo detectarlo:** escribir el test en rojo **antes** del arreglo (TDD) y comprobar que el rojo dice lo esperado. En el #174, el test nuevo se escribió con el barco existente a propósito: sin eso habría salido en verde desde el principio, por la `NotFoundException` del barco.
+
+**Relacionado (#174):** para afirmar que **no** pasa nada, `.Should().NotThrowAsync()` (`assertDoesNotThrow` en JUnit), y para comprobar el contenido de una colección, `barco.Regatas.Should().ContainSingle(r => r.Id == 2)`: exactamente un elemento y que cumple la condición (`assertThat(lista).singleElement().matches(...)` en AssertJ). Ver [[Guía definitiva de CSharp]] para el resto de aserciones.
+
+**Relacionado (#155, #161):** un verde que no has visto pasar antes por rojo no prueba nada. En el #155 el «verde» eran resultados antiguos del panel de tests (el helper estaba pegado en la clase equivocada y no compilaba, `CS0103`). En el #161 el test positivo `Contenedor_NoTieneDependenciasCautivas` salía verde con `ValidateOnBuild` apagado por un `!` olvidado; solo lo delató el test negativo, que mete a propósito una dependencia cautiva. Comprueba siempre el total de tests (`total: N`) y el resumen final, no solo el color.
+
+---
+
+### `WebApplicationFactory`, `IClassFixture` y `WithWebHostBuilder`
+
+**Qué es:** tres piezas para probar la aplicación **arrancada de verdad** dentro del proceso de test, sin abrir un puerto:
+- `WebApplicationFactory<Program>` (paquete `Microsoft.AspNetCore.Mvc.Testing`) ejecuta el `Program.cs` real. `.Services` da acceso al contenedor de DI y `.CreateClient()` a un `HttpClient` contra la API. Requiere que `Program` sea accesible (`public partial class Program`).
+- `IClassFixture<T>` (xUnit) crea **una** instancia de `T` por clase de tests y la inyecta en el constructor, para no arrancar la API en cada `[Fact]`.
+- `WithWebHostBuilder(...)` devuelve una **fábrica derivada** con cambios (servicios extra, configuración) sin tocar la original: lo que se registra ahí solo existe en ese test.
+
+**Equivalente en Java:** `@SpringBootTest` arranca el contexto real; Spring cachea el contexto entre tests con la misma configuración (el papel de `IClassFixture`); `@TestConfiguration` o `@MockBean` equivalen a `WithWebHostBuilder` + `ConfigureServices`.
+
+**Ejemplo real (#161, `ContenedorDiTests.cs`):**
+```csharp
+public class ContenedorDiTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly WebApplicationFactory<Program> _factory;
+    public ContenedorDiTests(WebApplicationFactory<Program> factory) => _factory = factory;
+
+    [Fact]
+    public void Contenedor_ConUnSingletonQueRecibeUnScoped_FallaAlConstruirse()
+    {
+        var fabricaConCautiva = _factory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services =>
+                services.AddSingleton<ICacheCautiva, CacheCautiva>()));
+
+        var act = () => fabricaConCautiva.Services;   // construye el contenedor
+
+        act.Should().Throw<Exception>().WithMessage("*Cannot consume scoped service*");
+    }
+}
+```
+- Las clases de apoyo (`ICacheCautiva`, `CacheCautiva`) van `internal`: visibles solo dentro del proyecto de tests, que es el único que las usa (parecido a *package-private* en Java).
+- Este test arranca el `Program.cs` real, y ahí `ServerVersion.AutoDetect` se conecta a MySQL: **necesita el contenedor `marina-mysql` encendido** (lo resuelve el #177, tests de integración).
+
+---
+
+### `DbContext` de pruebas que falla al guardar (y `MySqlException` por reflexión)
+
+**Qué es:** el proveedor InMemory no produce errores de base de datos reales (ver «Lo que no prueba el proveedor InMemory»). Para probar código que **reacciona** a un fallo de la base de datos se hereda de `MarinaDbContext` y se sobrescribe `SaveChangesAsync` (es `virtual`) para que lance la excepción que se le pase. El test decide qué falla.
+
+Hay un segundo obstáculo: `MySqlException` (MySqlConnector 2.3.5) **no tiene constructores públicos**. Se crea por reflexión, llamando al constructor interno `(MySqlErrorCode, string)`. Alternativas: un *wrapper* propio o un test de integración contra MySQL real (#177).
+
+**Equivalente en Java:** `doThrow(new DataIntegrityViolationException("..."))` de Mockito sobre el repositorio. Allí la excepción de Spring sí tiene constructor público y no hace falta reflexión.
+
+**Ejemplo real (#155, `AmarreRepositoryTests.cs`):**
+```csharp
+internal class DbContextQueFallaAlGuardar : MarinaDbContext
+{
+    private readonly Exception _excepcion;
+    public DbContextQueFallaAlGuardar(DbContextOptions<MarinaDbContext> options, Exception excepcion)
+        : base(options) => _excepcion = excepcion;
+
+    public override Task<int> SaveChangesAsync(CancellationToken ct = default) => throw _excepcion;
+}
+
+private static MySqlException CrearMySqlException(MySqlErrorCode codigo, string mensaje) =>
+    (MySqlException)Activator.CreateInstance(
+        typeof(MySqlException), BindingFlags.NonPublic | BindingFlags.Instance,
+        binder: null, args: new object[] { codigo, mensaje }, culture: null)!;
+```
+Tres tests con este montaje: un 1062 → `ConflictException`; un `DbUpdateException` sin `MySqlException` dentro → sale tal cual; y un `MySqlException` 1213 (deadlock) → sale tal cual. Los dos últimos protegen el filtro `{ Number: 1062 }`: sin ellos, un `catch` demasiado ancho pasaría desapercibido.
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM
@@ -654,6 +1138,38 @@ Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 **Ejemplo (real del proyecto):** rama `feature/crud-tripulante` con commits `wip: TripulanteRepository`, `wip: DTOs, Mapper y Service...`, `feat: TripulantesController...`, `test: TripulanteServiceTests...` → tras squash and merge, en `master` aparece un único commit: `feat: CRUD de Tripulante (#150)`.
 
 ---
+
+---
+
+### git branch -D tras un squash and merge
+
+**Qué es:** con *squash and merge*, GitHub crea en `master` un commit **nuevo** (otro hash) con todo el contenido de la rama. Git compara hashes, no contenido, así que no reconoce tu rama local como mergeada: `git branch -d` (minúscula) se niega a borrarla y hay que usar `-D` (mayúscula, forzado). No se pierde nada, porque el contenido ya está en `master`.
+
+**Ejemplo (PR #10, 2026-09-30):**
+```powershell
+git switch master
+git pull
+git branch -D fix/seguridad-secretos
+git push origin --delete fix/seguridad-secretos   # o el botón "Delete branch" del PR
+```
+
+---
+
+## Errores frecuentes (compilación y entorno)
+
+Errores que ya han salido en el proyecto y que no son de lógica, sino de herramientas o de entorno. Cada uno costó tiempo la primera vez.
+
+| Síntoma | Causa | Solución |
+|---|---|---|
+| **MSB3027** / MSB3021: *Could not copy ... The file is locked by: "MarinaApi (PID)"* | La API sigue arrancada y Windows bloquea su `.dll` | Parar la API (Ctrl+C) antes de `dotnet build`/`test`, o trabajar con `dotnet watch run` |
+| **MSB1003**: *Specify a project or solution file* | `dotnet test` en la raíz de `Marina_C#`, donde no hay `.sln` | `dotnet test MarinaApi.Tests` (o crear la solución con `dotnet new sln` + `dotnet sln add`) |
+| **CS7036**: *There is no argument given that corresponds to the required parameter* | Se añadió un parámetro a un `record` posicional y algún `new` no lo pasa. En un record posicional todo parámetro es obligatorio, aunque admita `null` | Pasarlo en todas las llamadas (normalmente en el Mapper) o darle valor por defecto |
+| **CS0121**: *The call is ambiguous between...* con `ReturnsAsync(null)` | El `null` encaja en varias sobrecargas | `ReturnsAsync((Amarre?)null)` (ver Testing) |
+| `DirectoryNotFoundException: ...\wwwroot` al arrancar la API | Manifiesto `*.staticwebassets.runtime.json` de **otra rama** (la #171) en `bin/` y `obj/`. Cambiar de rama no limpia `bin/` | `dotnet clean .\MarinaApi` y volver a arrancar (ha pasado tres veces) |
+| `dotnet ef ...` falla con *Unable to connect to any of the specified MySQL hosts* | `ServerVersion.AutoDetect(...)` en `Program.cs` consulta la versión a MySQL al crear el `DbContext`, también en tiempo de diseño (`migrations add`) | `docker start marina-mysql` antes de cualquier comando `dotnet ef` |
+| `dotnet watch` se para con `Contract.Fail` en `HotReloadMSBuildWorkspace` | Fallo interno de *hot reload* al crear archivos nuevos, no del código propio | Reiniciar `dotnet watch`. Para cambios solo en `wwwroot` basta `dotnet run` + F5 |
+
+**Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 
 ---
 
