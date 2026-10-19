@@ -31,6 +31,25 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
     public async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
         await _dbSet.ToListAsync(ct);
 
+    // Equivalente a findAll(PageRequest.of(pagina - 1, tamanio, Sort.by("id"))) de
+    // Spring Data JPA, que también lanza dos consultas: un COUNT y un SELECT paginado.
+    public async Task<(List<T> Elementos, int Total)> FindPageAsync(
+        Expression<Func<T, long>> ordenarPor,
+        int pagina,
+        int tamanio,
+        CancellationToken ct = default)
+    {
+        var total = await _dbSet.CountAsync(ct);
+
+        var elementos = await _dbSet
+            .OrderBy(ordenarPor)
+            .Skip((pagina - 1) * tamanio)
+            .Take(tamanio)
+            .ToListAsync(ct);
+
+        return (elementos, total);
+    }
+
     // Equivalente a las consultas HQL personalizadas del Capítulo 8, pero
     // expresadas como lambda LINQ en vez de strings HQL con nombres de atributo.
     public async Task<List<T>> FindAsync(Expression<Func<T, bool>> predicate, CancellationToken ct = default) =>
