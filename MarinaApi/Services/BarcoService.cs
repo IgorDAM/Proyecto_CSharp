@@ -10,6 +10,7 @@ namespace MarinaApi.Services;
 public interface IBarcoService
 {
     Task<List<BarcoDto>> FindAllAsync(CancellationToken ct = default);
+    Task<PaginaDto<BarcoDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default);
     Task<BarcoDto> FindByIdAsync(long id, CancellationToken ct = default);
     Task<BarcoDto> CreateAsync(BarcoRequestDto dto, CancellationToken ct = default);
     Task<BarcoDto> UpdateAsync(long id, BarcoRequestDto dto, CancellationToken ct = default);
@@ -43,6 +44,18 @@ public class BarcoService : IBarcoService
     {
         var barcos = await _barcoRepository.FindAllAsync(ct);
         return barcos.Select(b => b.ToDto()).ToList();
+    }
+
+    /// <summary>
+    /// Devuelve una página de barcos ordenados por Id. <paramref name="pagina"/> empieza
+    /// en 1. La validación de los límites (pagina >= 1, tamanio entre 1 y 100) la hace
+    /// el controlador; aquí se da por buena.
+    /// </summary>
+    public async Task<PaginaDto<BarcoDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default)
+    {
+        var (barcos, total) = await _barcoRepository.FindPageAsync(b => b.Id, pagina, tamanio, ct);
+        var dtos = barcos.Select(b => b.ToDto()).ToList();
+        return new PaginaDto<BarcoDto>(dtos, pagina, tamanio, total);
     }
 
     public async Task<BarcoDto> FindByIdAsync(long id, CancellationToken ct = default)
