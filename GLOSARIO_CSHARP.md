@@ -545,7 +545,7 @@ builder.Services.AddAuthorization(options =>
 });
 ```
 ```csharp
-// Así se abriría un endpoint concreto (p.ej. para el frontend de #171)
+// Así se abriría un endpoint concreto (p.ej. para el frontend de #179)
 [AllowAnonymous]
 [HttpGet]
 public async Task<ActionResult<List<BarcoDto>>> GetAll(CancellationToken ct) => ...
@@ -559,7 +559,7 @@ public async Task<ActionResult<List<BarcoDto>>> GetAll(CancellationToken ct) => 
 
 **Equivalente en Java/Spring:** `@CrossOrigin` o un `CorsConfigurationSource` con `setAllowedOrigins(...)`.
 
-**El error que tenía el proyecto:** `AllowAnyOrigin()` permitía que cualquier página abierta en el navegador llamara a la API en `localhost`, incluidos los `DELETE`. Ahora se usa una lista blanca configurable. Un frontend servido **desde la propia API** (`wwwroot`, rama #171) es el mismo origen, así que no necesita CORS.
+**El error que tenía el proyecto:** `AllowAnyOrigin()` permitía que cualquier página abierta en el navegador llamara a la API en `localhost`, incluidos los `DELETE`. Ahora se usa una lista blanca configurable. Un frontend servido **desde la propia API** (`wwwroot`, rama del #179) es el mismo origen, así que no necesita CORS.
 
 **Ejemplo (real del proyecto):**
 ```csharp
@@ -975,7 +975,7 @@ _amarreRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<Amarre>(), It.IsAny<Can
 - En el test del #172 se configuran `ExistsAsync` y `FindByBarcoIdAsync` aunque el servicio corte antes de llamarlos. Con `Loose` no molestan, y el test no depende del orden de las comprobaciones.
 - Con `Strict` cada test se rompería al reordenar el código del servicio, aunque el comportamiento fuera el mismo (tests "frágiles").
 
-**La trampa de `Loose`:** un método que se olvidó configurar devuelve `null` en silencio, y el fallo aparece lejos de la causa (un `NullReferenceException` en el servicio, o un test que falla sin motivo aparente). Pasó en el #171 con `FindAllAsync_MapeaTodasLasEntidadesADto`: el servicio empezó a llamar a `FindAllWithBarcoAsync`, que no tenía `Setup`, y Moq devolvía `null`.
+**La trampa de `Loose`:** un método que se olvidó configurar devuelve `null` en silencio, y el fallo aparece lejos de la causa (un `NullReferenceException` en el servicio, o un test que falla sin motivo aparente). Pasó en el #179 con `FindAllAsync_MapeaTodasLasEntidadesADto`: el servicio empezó a llamar a `FindAllWithBarcoAsync`, que no tenía `Setup`, y Moq devolvía `null`.
 
 ---
 
@@ -1165,7 +1165,7 @@ Errores que ya han salido en el proyecto y que no son de lógica, sino de herram
 | **MSB1003**: *Specify a project or solution file* | `dotnet test` en la raíz de `Marina_C#`, donde no hay `.sln` | `dotnet test MarinaApi.Tests` (o crear la solución con `dotnet new sln` + `dotnet sln add`) |
 | **CS7036**: *There is no argument given that corresponds to the required parameter* | Se añadió un parámetro a un `record` posicional y algún `new` no lo pasa. En un record posicional todo parámetro es obligatorio, aunque admita `null` | Pasarlo en todas las llamadas (normalmente en el Mapper) o darle valor por defecto |
 | **CS0121**: *The call is ambiguous between...* con `ReturnsAsync(null)` | El `null` encaja en varias sobrecargas | `ReturnsAsync((Amarre?)null)` (ver Testing) |
-| `DirectoryNotFoundException: ...\wwwroot` al arrancar la API | Manifiesto `*.staticwebassets.runtime.json` de **otra rama** (la #171) en `bin/` y `obj/`. Cambiar de rama no limpia `bin/` | `dotnet clean .\MarinaApi` y volver a arrancar (ha pasado tres veces) |
+| `DirectoryNotFoundException: ...\wwwroot` al arrancar la API | Manifiesto `*.staticwebassets.runtime.json` de **otra rama** (la del frontend, `feature/171-frontend-listados`) en `bin/` y `obj/`. Cambiar de rama no limpia `bin/` | `dotnet clean .\MarinaApi` y volver a arrancar (ha pasado tres veces) |
 | `dotnet ef ...` falla con *Unable to connect to any of the specified MySQL hosts* | `ServerVersion.AutoDetect(...)` en `Program.cs` consulta la versión a MySQL al crear el `DbContext`, también en tiempo de diseño (`migrations add`) | `docker start marina-mysql` antes de cualquier comando `dotnet ef` |
 | `dotnet watch` se para con `Contract.Fail` en `HotReloadMSBuildWorkspace` | Fallo interno de *hot reload* al crear archivos nuevos, no del código propio | Reiniciar `dotnet watch`. Para cambios solo en `wwwroot` basta `dotnet run` + F5 |
 
