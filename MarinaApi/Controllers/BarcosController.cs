@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
 using System.ComponentModel.DataAnnotations;
@@ -28,9 +29,11 @@ public class BarcosController : ControllerBase
 
     /// <summary>
     /// Lista los barcos paginados, ordenados por Id. La página empieza en 1;
-    /// el tamaño por defecto es 20 y el máximo 100.
+    /// el tamaño por defecto es 20 y el máximo 100. Es público (sin token) para
+    /// que el frontend de solo lectura pueda pintar el listado.
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(PaginaDto<BarcoDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<PaginaDto<BarcoDto>>> GetAll(

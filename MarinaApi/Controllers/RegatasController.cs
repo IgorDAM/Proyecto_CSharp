@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
 
@@ -17,6 +18,7 @@ public class RegatasController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(List<RegataDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<RegataDto>>> GetAll(CancellationToken ct) =>
         Ok(await _regataService.FindAllAsync(ct));

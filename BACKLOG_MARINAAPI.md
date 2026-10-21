@@ -37,8 +37,9 @@
 | **#176** | HSTS fuera de Development | Producción | 🟢 | 1 | — | ⬜ |
 | **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
 | **#178** | Mensaje de `NotFoundException` siempre en masculino ("Regata ... no encontrado") | Calidad | 🟢 | 1 | — | ⬜ |
+| **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ⬜ |
 
-**Total: 54 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178; ya hechos: #154, #156, #159, #168, #171, #172 y #174). Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 57 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179; ya hechos: #154, #156, #159, #168, #171, #172 y #174). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
@@ -52,7 +53,7 @@
 ### #154 — Borrar un Barco elimina también su Amarre ✅ [PR #12](https://github.com/IgorDAM/Proyecto_CSharp/pull/12)
 
 - **Tipo:** Bug · **Puntos:** 2
-- **Problema:** en [MarinaDbContext.cs](MarinaApi/Data/MarinaDbContext.cs), la relación 1:1 `Amarre → Barco` está configurada con `.OnDelete(DeleteBehavior.Cascade)`. Como la FK `BarcoId` está en `Amarre`, **al borrar un barco se borra la fila del amarre**. Un amarre es infraestructura física del puerto: debería quedar libre (`BarcoId = NULL`), no desaparecer. El comentario del código lo presenta como equivalente a `CascadeType.ALL + orphanRemoval`, pero en la práctica borra el lado que debería sobrevivir.
+- **Problema:** en `MarinaApi/Data/MarinaDbContext.cs`, la relación 1:1 `Amarre → Barco` está configurada con `.OnDelete(DeleteBehavior.Cascade)`. Como la FK `BarcoId` está en `Amarre`, **al borrar un barco se borra la fila del amarre**. Un amarre es infraestructura física del puerto: debería quedar libre (`BarcoId = NULL`), no desaparecer. El comentario del código lo presenta como equivalente a `CascadeType.ALL + orphanRemoval`, pero en la práctica borra el lado que debería sobrevivir.
 - **Criterios de aceptación:**
   - [x] La relación usa `DeleteBehavior.SetNull`.
   - [x] Nueva migración generada y revisada (`dotnet ef migrations add AmarreSetNullAlBorrarBarco`): `DROP FOREIGN KEY` + `ADD CONSTRAINT ... ON DELETE SET NULL`.
@@ -123,7 +124,7 @@
 ### #158 — Unit of Work: los repositorios no deben llamar a `SaveChangesAsync`
 
 - **Tipo:** Deuda técnica · **Puntos:** 5
-- **Problema:** [GenericRepository.cs](MarinaApi/Repositories/GenericRepository.cs) llama a `SaveChangesAsync` dentro de `AddAsync`, `UpdateAsync` y `DeleteAsync`. Cada operación es su propia transacción. En cuanto un caso de uso toque dos repositorios (por ejemplo, asignar un amarre y registrar un movimiento en un histórico), un fallo a mitad deja datos a medias sin rollback posible. Además, el comentario del propio método dice que `SaveChangesAsync` "normalmente se llama una sola vez desde el servicio", justo lo contrario de lo que hace el código.
+- **Problema:** `MarinaApi/Repositories/GenericRepository.cs` llama a `SaveChangesAsync` dentro de `AddAsync`, `UpdateAsync` y `DeleteAsync`. Cada operación es su propia transacción. En cuanto un caso de uso toque dos repositorios (por ejemplo, asignar un amarre y registrar un movimiento en un histórico), un fallo a mitad deja datos a medias sin rollback posible. Además, el comentario del propio método dice que `SaveChangesAsync` "normalmente se llama una sola vez desde el servicio", justo lo contrario de lo que hace el código.
 - **Criterios de aceptación:**
   - [ ] Interfaz `IUnitOfWork` con `SaveChangesAsync`, implementada por `MarinaDbContext` y registrada como `AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<MarinaDbContext>())`.
   - [ ] `GenericRepository` sin llamadas a `SaveChangesAsync`; `Add`/`Update`/`Remove` pasan a ser síncronos o solo marcan cambios.
@@ -147,7 +148,7 @@
 ### #160 — Sustituir `FluentValidation.AspNetCore` y añadir validadores
 
 - **Tipo:** Deuda técnica · **Puntos:** 3
-- **Problema:** [MarinaApi.csproj](MarinaApi/MarinaApi.csproj) referencia `FluentValidation.AspNetCore`, un paquete que su autor ha dejado de mantener y desaconseja. Además **no hay ningún validador** en el proyecto: la validación de entrada depende solo de las Data Annotations de las entidades, que no están en los DTOs.
+- **Problema:** `MarinaApi/MarinaApi.csproj` referencia `FluentValidation.AspNetCore`, un paquete que su autor ha dejado de mantener y desaconseja. Además **no hay ningún validador** en el proyecto: la validación de entrada depende solo de las Data Annotations de las entidades, que no están en los DTOs.
 - **Criterios de aceptación:**
   - [ ] Quitar `FluentValidation.AspNetCore`; añadir `FluentValidation` y `FluentValidation.DependencyInjectionExtensions`.
   - [ ] `AddValidatorsFromAssemblyContaining<Program>()` en `Program.cs`.
@@ -177,7 +178,7 @@
 ### #163 — Middleware de errores → `IExceptionHandler` + `ProblemDetails`
 
 - **Tipo:** Deuda técnica · **Puntos:** 3
-- **Problema:** [ExceptionHandlingMiddleware.cs](MarinaApi/Middleware/ExceptionHandlingMiddleware.cs) serializa a mano un objeto anónimo con formato *problem+json*. Los errores que genera el propio framework (400 de validación, 404 de rutas inexistentes, 405) salen con otro formato, no llevan `traceId`, y las cancelaciones del cliente (`OperationCanceledException`) se registran como 500.
+- **Problema:** `MarinaApi/Middleware/ExceptionHandlingMiddleware.cs` serializa a mano un objeto anónimo con formato *problem+json*. Los errores que genera el propio framework (400 de validación, 404 de rutas inexistentes, 405) salen con otro formato, no llevan `traceId`, y las cancelaciones del cliente (`OperationCanceledException`) se registran como 500.
 - **Criterios de aceptación:**
   - [ ] `IExceptionHandler` que traduce `NotFoundException` → 404, `ConflictException` → 409, cancelación del cliente → 499 sin `LogError`, y el resto → 500 con mensaje genérico.
   - [ ] `AddProblemDetails` con `traceId` en `Extensions`; `app.UseExceptionHandler()`.
@@ -257,7 +258,7 @@
 ### #168 — CORS restringido por configuración ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10)
 
 - **Tipo:** Producción · **Puntos:** 1
-- **Problema:** [Program.cs](MarinaApi/Program.cs) usa `AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()`.
+- **Problema:** `MarinaApi/Program.cs` usa `AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()`.
 - **Criterios de aceptación:**
   - [x] Orígenes permitidos leídos de `Cors:AllowedOrigins` en configuración (lista blanca, vacía por defecto).
   - [x] ~~`AllowAnyOrigin` solo en `Development`~~ → descartado: la lista vacía se usa también en Development, porque con `AllowAnyOrigin` cualquier web abierta en el navegador podía llamar a la API en `localhost`. El frontend de `wwwroot` es el mismo origen y no necesita CORS.
@@ -314,7 +315,7 @@
 
 - **Tipo:** Chore · **Puntos:** 1
 - **Problema:**
-  - En [MarinaDbContext.cs](MarinaApi/Data/MarinaDbContext.cs), el bloque de la relación Barco ↔ Tripulante está sin indentar.
+  - En `MarinaApi/Data/MarinaDbContext.cs`, el bloque de la relación Barco ↔ Tripulante está sin indentar.
   - La configuración de Organizador ↔ Regata repite el mismo comentario en cada línea encadenada.
   - En `Barco.cs`, el comentario de `Tripulantes` habla de "skip navigations" y de "tabla intermedia", pero es una relación 1:N con FK normal.
   - La última línea de [BarcoRepository.cs](MarinaApi/Repositories/BarcoRepository.cs) está sin indentar.
@@ -323,3 +324,19 @@
   - [ ] `dotnet format` ejecutado sobre la solución.
   - [ ] Comentarios corregidos para que describan lo que hace el código.
   - [ ] Opcional: añadir `.editorconfig` para que el formato no dependa de cada IDE.
+
+### #179 — Frontend simple de solo lectura (HTML + Bootstrap + JS)
+
+- **Tipo:** Feature · **Puntos:** 3
+- **Contexto:** MarinaApi solo se puede usar desde Swagger. Se añade un frontend mínimo con el mismo stack que SEIDEL indica en su porfolio para su plataforma web de gestión de eventos deportivos (.NET + REST API + MySQL, con HTML/CSS, JavaScript y Bootstrap en el front).
+- **Objetivo de aprendizaje:** el frontend es el medio; el fin es entender cómo se conecta con el backend y qué aporta cada capa (Middleware, Controller, DTO, Service, Repository, DbContext). Se documenta en `ARQUITECTURA_CAPAS.md` ([[Arquitectura por capas]] en el vault).
+- **Decisión:** las páginas viven en `MarinaApi/wwwroot/` y las sirve la propia API, en el mismo origen. No hace falta CORS, así que no condiciona al #168.
+- **Criterios de aceptación:**
+  - [ ] `Program.cs` sirve `wwwroot` (`UseDefaultFiles` + `UseStaticFiles`).
+  - [ ] `index.html` con barra de navegación Bootstrap.
+  - [ ] Listado de Barcos (`GET /api/barcos`) en una tabla.
+  - [ ] Listado de Regatas (`GET /api/regatas`), mostrando `totalBarcosInscritos`.
+  - [ ] Listado de Tripulantes (`GET /api/tripulantes`).
+  - [ ] Mensaje visible si la API falla o la lista viene vacía.
+  - [ ] `ARQUITECTURA_CAPAS.md` con el recorrido completo de una petición y al menos un experimento por capa.
+- **Fuera de alcance:** crear, editar y borrar desde el frontend (ticket aparte si se quiere más adelante).

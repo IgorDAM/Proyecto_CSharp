@@ -1,6 +1,6 @@
 > Generado con Claude Research el 23/09/2026 (Claude 101, lección 10). Fuentes de 2025-2026: revisar versiones en NuGet antes de usar.
 
-# Plataforma LLM + RAG sobre datos propios con .NET/C#: arquitectura, librerías, bases vectoriales y ruta de aprendizaje para Igor (2026-2027)
+# Plataforma LLM + RAG sobre datos propios con .NET/CSharp: arquitectura, librerías, bases vectoriales y ruta de aprendizaje para Igor (2026-2027)
 
 Para construir hoy un RAG en .NET, la base recomendada es **.NET 10 LTS + Microsoft.Extensions.AI (IChatClient/IEmbeddingGenerator) + Microsoft.Extensions.VectorData con un conector CommunityToolkit.VectorData + PostgreSQL con pgvector**. Si necesitas agentes u orquestación, añade Microsoft Agent Framework 1.0, que ya es GA. Para proyectos nuevos, Kernel Memory y los nombres antiguos `Microsoft.SemanticKernel.Connectors.*` deben evitarse.
 

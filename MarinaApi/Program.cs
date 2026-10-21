@@ -148,6 +148,10 @@ app.UseHttpsRedirection();
 // El orden importa: primero se identifica al usuario leyendo el token
 // (UseAuthentication) y después se decide si puede entrar (UseAuthorization).
 app.UseAuthentication();
+// ── Frontend estático (wwwroot) ──
+// Equivalente a src/main/resources/static/ en Spring Boot.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.UseAuthorization();
 app.MapControllers();
 
