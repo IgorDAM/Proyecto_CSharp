@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
 
@@ -19,6 +20,7 @@ public class TripulantesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(List<TripulanteDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<List<TripulanteDto>>> GetAll(CancellationToken ct) =>
         Ok(await _tripulanteService.FindAllAsync(ct));
