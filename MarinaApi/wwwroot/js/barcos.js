@@ -2,8 +2,8 @@ import { mostrarMensaje, obtenerDatos } from "./comun.js";
 
 async function cargarBarcos() {
     try {
-        const pagina = await obtenerDatos("/api/barcos");
-        const barcos = pagina.elementos;
+        const respuesta = await obtenerDatos("/api/barcos");
+        const barcos = respuesta.elementos;
 
         if (barcos.length === 0) {
             mostrarMensaje("No hay barcos registrados.", "info");

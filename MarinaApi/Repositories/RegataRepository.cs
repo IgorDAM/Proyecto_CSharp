@@ -14,6 +14,7 @@ public interface IRegataRepository : IGenericRepository<Regata>
     Task<List<Regata>> FindByDistanciaGreaterThanAsync(int distancia, CancellationToken ct = default);
     Task<Regata?> FindByIdWithBarcosAsync(long id, CancellationToken ct = default);
     Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default);
+    Task<(List<RegataDto> Elementos, int Total)> FindPageConContadorAsync(int pagina, int tamanio, CancellationToken ct = default);
     Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default);
     Task<int?> ContarTripulantesAsync(long regataId, CancellationToken ct = default);
 }
@@ -43,6 +44,14 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
         await _context.Regatas
             .Select(RegataMapper.ToDtoProjection)
             .ToListAsync(ct);
+
+    // Misma proyección que FindAllConContadorAsync (cuenta los barcos en SQL, sin N+1),
+    // pero paginada. Se ordena y recorta sobre Regata y se proyecta a RegataDto al final:
+    // EF Core no traduce un OrderBy sobre las propiedades de un DTO construido con "new".
+    public async Task<(List<RegataDto> Elementos, int Total)> FindPageConContadorAsync(
+        int pagina, int tamanio, CancellationToken ct = default) =>
+        await _context.Regatas
+            .PaginarAsync(r => r.Id, RegataMapper.ToDtoProjection, pagina, tamanio, ct);
 
     public async Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default) =>
         await _context.Regatas

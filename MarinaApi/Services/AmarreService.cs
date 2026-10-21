@@ -9,6 +9,7 @@ namespace MarinaApi.Services;
 public interface IAmarreService
 {
     Task<List<AmarreDto>> FindAllAsync(CancellationToken ct = default);
+    Task<PaginaDto<AmarreDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default);
     Task<AmarreDto> FindByIdAsync(long id, CancellationToken ct = default);
     Task<AmarreDto> CreateAsync(AmarreRequestDto dto, CancellationToken ct = default);
     Task DeleteAsync(long id, CancellationToken ct = default);
@@ -33,6 +34,13 @@ public class AmarreService : IAmarreService
 
     public async Task<List<AmarreDto>> FindAllAsync(CancellationToken ct = default) =>
         (await _amarreRepository.FindAllAsync(ct)).Select(a => a.ToDto()).ToList();
+
+    public async Task<PaginaDto<AmarreDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default)
+    {
+        var (amarres, total) = await _amarreRepository.FindPageAsync(a => a.Id, pagina, tamanio, ct);
+        var dtos = amarres.Select(a => a.ToDto()).ToList();
+        return new PaginaDto<AmarreDto>(dtos, pagina, tamanio, total);
+    }
 
     public async Task<AmarreDto> FindByIdAsync(long id, CancellationToken ct = default)
     {
