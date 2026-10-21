@@ -11,6 +11,7 @@ namespace MarinaApi.Services;
 public interface IRegataService
 {
     Task<List<RegataDto>> FindAllAsync(CancellationToken ct = default);
+    Task<PaginaDto<RegataDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default);
     Task<RegataDto> FindByIdAsync(long id, CancellationToken ct = default);
     Task<RegataDto> CreateAsync(RegataRequestDto dto, CancellationToken ct = default);
     Task DeleteAsync(long id, CancellationToken ct = default);
@@ -35,6 +36,12 @@ public class RegataService : IRegataService
 
     public async Task<List<RegataDto>> FindAllAsync(CancellationToken ct = default) =>
         await _regataRepository.FindAllConContadorAsync(ct);
+
+    public async Task<PaginaDto<RegataDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default)
+    {
+        var (regatas, total) = await _regataRepository.FindPageConContadorAsync(pagina, tamanio, ct);
+        return new PaginaDto<RegataDto>(regatas, pagina, tamanio, total);
+    }
 
     public async Task<RegataDto> FindByIdAsync(long id, CancellationToken ct = default)
     {

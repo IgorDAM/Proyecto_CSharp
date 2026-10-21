@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace MarinaApi.Controllers;
 
@@ -19,11 +20,20 @@ public class TripulantesController : ControllerBase
         _tripulanteService = tripulanteService;
     }
 
+    /// <summary>
+    /// Lista los tripulantes paginados, ordenados por Id, con el nombre de su barco.
+    /// La página empieza en 1; el tamaño por defecto es 20 y el máximo 100.
+    /// Es público (sin token) para que el frontend de solo lectura pueda pintar el listado.
+    /// </summary>
     [HttpGet]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(List<TripulanteDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<TripulanteDto>>> GetAll(CancellationToken ct) =>
-        Ok(await _tripulanteService.FindAllAsync(ct));
+    [ProducesResponseType(typeof(PaginaDto<TripulanteDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginaDto<TripulanteDto>>> GetAll(
+        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
+        [FromQuery, Range(1, 100)] int tamanio = 20,
+        CancellationToken ct = default) =>
+        Ok(await _tripulanteService.FindPageAsync(pagina, tamanio, ct));
 
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(TripulanteDto), StatusCodes.Status200OK)]

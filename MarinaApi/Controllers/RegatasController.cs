@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace MarinaApi.Controllers;
 
@@ -17,11 +18,20 @@ public class RegatasController : ControllerBase
         _regataService = regataService;
     }
 
+    /// <summary>
+    /// Lista las regatas paginadas, ordenadas por Id, con el total de barcos inscritos
+    /// de cada una. La página empieza en 1; el tamaño por defecto es 20 y el máximo 100.
+    /// Es público (sin token) para que el frontend de solo lectura pueda pintar el listado.
+    /// </summary>
     [HttpGet]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(List<RegataDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<RegataDto>>> GetAll(CancellationToken ct) =>
-        Ok(await _regataService.FindAllAsync(ct));
+    [ProducesResponseType(typeof(PaginaDto<RegataDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginaDto<RegataDto>>> GetAll(
+        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
+        [FromQuery, Range(1, 100)] int tamanio = 20,
+        CancellationToken ct = default) =>
+        Ok(await _regataService.FindPageAsync(pagina, tamanio, ct));
 
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(RegataDto), StatusCodes.Status200OK)]
@@ -70,7 +80,7 @@ public class RegatasController : ControllerBase
         return NoContent();
     }
 
-        /// <summary>Total de tripulantes inscritos en la regata, sumando los de todos sus barcos.</summary>
+    /// <summary>Total de tripulantes inscritos en la regata, sumando los de todos sus barcos.</summary>
     [HttpGet("{id:long}/tripulantes-totales")]
     [ProducesResponseType(typeof(int), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
