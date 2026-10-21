@@ -8,6 +8,7 @@ namespace MarinaApi.Services;
 public interface ITripulanteService
 {
     Task<List<TripulanteDto>> FindAllAsync(CancellationToken ct = default);
+    Task<PaginaDto<TripulanteDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default);
     Task<TripulanteDto> FindByIdAsync(long id, CancellationToken ct = default);
     Task<TripulanteDto> CreateAsync(TripulanteRequestDto dto, CancellationToken ct = default);
     Task<TripulanteDto> UpdateAsync(long id, TripulanteRequestDto dto, CancellationToken ct = default);
@@ -29,6 +30,13 @@ public class TripulanteService : ITripulanteService
 
     public async Task<List<TripulanteDto>> FindAllAsync(CancellationToken ct = default) =>
         (await _tripulanteRepository.FindAllWithBarcoAsync(ct)).Select(t => t.ToDto()).ToList();
+
+    public async Task<PaginaDto<TripulanteDto>> FindPageAsync(int pagina, int tamanio, CancellationToken ct = default)
+    {
+        var (tripulantes, total) = await _tripulanteRepository.FindPageWithBarcoAsync(pagina, tamanio, ct);
+        var dtos = tripulantes.Select(t => t.ToDto()).ToList();
+        return new PaginaDto<TripulanteDto>(dtos, pagina, tamanio, total);
+    }
 
     public async Task<TripulanteDto> FindByIdAsync(long id, CancellationToken ct = default)
     {

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using MarinaApi.Dtos;
 using MarinaApi.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace MarinaApi.Controllers;
 
@@ -16,10 +17,18 @@ public class AmarresController : ControllerBase
         _amarreService = amarreService;
     }
 
+    /// <summary>
+    /// Lista los amarres paginados, ordenados por Id. La página empieza en 1;
+    /// el tamaño por defecto es 20 y el máximo 100.
+    /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(List<AmarreDto>), StatusCodes.Status200OK)]
-    public async Task<ActionResult<List<AmarreDto>>> GetAll(CancellationToken ct) =>
-        Ok(await _amarreService.FindAllAsync(ct));
+    [ProducesResponseType(typeof(PaginaDto<AmarreDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<ActionResult<PaginaDto<AmarreDto>>> GetAll(
+        [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
+        [FromQuery, Range(1, 100)] int tamanio = 20,
+        CancellationToken ct = default) =>
+        Ok(await _amarreService.FindPageAsync(pagina, tamanio, ct));
 
     [HttpGet("{id:long}")]
     [ProducesResponseType(typeof(AmarreDto), StatusCodes.Status200OK)]

@@ -2,7 +2,8 @@ import { mostrarMensaje, obtenerDatos } from "./comun.js";
 
 async function cargarTripulantes() {
     try {
-        const tripulantes = await obtenerDatos("/api/tripulantes");
+        const respuesta = await obtenerDatos("/api/tripulantes");
+        const tripulantes = respuesta.elementos;
 
         if (tripulantes.length === 0) {
             mostrarMensaje("No hay tripulantes registrados.", "info");

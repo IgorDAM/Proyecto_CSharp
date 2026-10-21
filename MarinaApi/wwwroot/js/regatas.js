@@ -2,7 +2,8 @@ import { mostrarMensaje, obtenerDatos } from "./comun.js";
 
 async function cargarRegatas() {
     try {
-        const regatas = await obtenerDatos("/api/regatas");
+        const respuesta = await obtenerDatos("/api/regatas");
+        const regatas = respuesta.elementos;
 
         if (regatas.length === 0) {
             mostrarMensaje("No hay regatas registradas.", "info");
