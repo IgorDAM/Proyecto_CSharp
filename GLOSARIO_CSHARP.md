@@ -301,6 +301,39 @@ catch (DbUpdateException ex) when (ex.InnerException is MySqlException { Number:
 
 ---
 
+### Tuplas con nombre y deconstrucción
+
+**Qué es:** una tupla agrupa varios valores en uno sin crear una clase. Cada posición puede llevar nombre: `(List<Barco> Elementos, int Total)`. Quien la recibe puede usar `resultado.Elementos` o **deconstruirla** en variables sueltas: `var (elementos, total) = await repo.FindPageAsync(...);`.
+
+**Equivalente en Java:** no hay tuplas en el lenguaje. Se crea un `record Pagina(List<Barco> elementos, int total)` solo para devolver dos cosas, o se usa un `Pair` de una librería. En C# la tupla es del lenguaje y no hace falta declarar el tipo aparte.
+
+**Ejemplo real (`Repositories/PaginacionExtensions.cs` y `Services/AmarreService.cs`):**
+```csharp
+public static async Task<(List<T> Elementos, int Total)> PaginarAsync<T>(...)
+
+var (amarres, total) = await _repository.FindPageAsync(r => r.Id, pagina, tamanio, ct);
+```
+**Cuándo usarla:** para devolver dos o tres valores entre capas internas. Hacia fuera (la API) se usa un `record` con nombre, como `PaginaDto<T>`, porque forma parte del contrato JSON.
+
+---
+
+### Genéricos: `record PaginaDto<T>` y métodos con `<T, TResultado>`
+
+**Qué es:** `T` es un tipo que se decide en cada uso. Un `record` genérico (`PaginaDto<BarcoDto>`) y un método genérico (`PaginarAsync<T, TResultado>`) se escriben una vez y valen para cualquier entidad. Con varios parámetros de tipo, el compilador suele deducirlos de los argumentos y no hay que escribirlos en la llamada.
+
+**Equivalente en Java:** `record PaginaDto<T>(...)` y `<T, R> Page<R> paginar(...)`. La diferencia es que los genéricos de C# **no se borran** en tiempo de ejecución (en Java sí, *type erasure*), así que `typeof(T)` y `new T()` son posibles.
+
+**Ejemplo real (`Dtos/PaginaDto.cs`):**
+```csharp
+public record PaginaDto<T>(IReadOnlyList<T> Elementos, int Pagina, int Tamanio, int TotalElementos)
+{
+    public int TotalPaginas => (int)Math.Ceiling((double)TotalElementos / Tamanio);
+}
+```
+El `(double)` evita la división entera: `5 / 2` en `int` es `2`, no `2,5`, y `Ceiling` no tendría nada que redondear. `TotalPaginas` es una propiedad calculada: no es parámetro del constructor y aparece igualmente en el JSON.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
@@ -579,6 +612,23 @@ builder.Services.AddCors(options =>
 
 ---
 
+### `[FromQuery]` con `[Range]`: parámetros de paginación
+
+**Qué es:** `[FromQuery]` toma el valor de la query string (`?pagina=2&tamanio=10`) y `[Range(1, 100)]` lo valida. Con `[ApiController]` en la clase, si el valor no cumple el rango, el framework responde **400 con `ProblemDetails` antes de entrar al método**. El valor por defecto (`= 1`) se usa cuando el parámetro no viene.
+
+**Equivalente en Java:** `@RequestParam(defaultValue = "1") @Min(1) int pagina`, con `@Validated` en el controller. En Spring hay que acordarse de `@Validated`; en ASP.NET Core la validación va incluida con `[ApiController]`.
+
+**Ejemplo real (`Controllers/RegatasController.cs`):**
+```csharp
+public async Task<ActionResult<PaginaDto<RegataDto>>> GetAll(
+    [FromQuery, Range(1, int.MaxValue)] int pagina = 1,
+    [FromQuery, Range(1, 100)] int tamanio = 20,
+    CancellationToken ct = default)
+```
+Hace falta `using System.ComponentModel.DataAnnotations;`. El máximo de 100 evita que un cliente pida `tamanio=1000000` y cargue la tabla entera, que era justo el problema del #175.
+
+---
+
 ## Entity Framework Core
 
 ### Proyección a DTO con Select
@@ -749,6 +799,48 @@ dotnet ef migrations script InitialCreate AmarreSetNullAlBorrarBarco --project .
 **Equivalente en Java:** igual con Flyway sobre MySQL. Su documentación avisa de que en MySQL una migración fallida a medias deja el esquema en un estado intermedio.
 
 **Ejemplo real (#154):** el script de `AmarreSetNullAlBorrarBarco` acaba en `COMMIT`, pero entre el `DROP FOREIGN KEY` y el `ADD CONSTRAINT` ya ha habido un commit. Si fallara el segundo, la tabla `Amarres` se quedaría **sin FK**. Por eso, en un entorno real, el script se revisa antes (`migrations script --idempotent`) en lugar de lanzar `database update` a ciegas.
+
+---
+
+### Paginar con `CountAsync`, `OrderBy`, `Skip` y `Take`
+
+**Qué es:** una consulta sobre un `DbSet` es un `IQueryable<T>`: una **consulta sin ejecutar**. Cada `Where`, `OrderBy`, `Skip` o `Take` le añade una pieza, y el SQL solo se envía al llamar a `ToListAsync()`, `CountAsync()`, `FirstOrDefaultAsync()`... (ejecución diferida). Paginar son **dos consultas**: un `COUNT` para el total y un `SELECT ... ORDER BY ... LIMIT ... OFFSET ...` para la página.
+
+**Equivalente en Java:** `Pageable` + `Page<T>` de Spring Data (`findAll(PageRequest.of(pagina - 1, tamanio, Sort.by("id")))`), que hace las dos consultas por ti.
+
+**Ejemplo real (`Repositories/PaginacionExtensions.cs`):**
+```csharp
+var total = await consulta.CountAsync(ct);
+var elementos = await consulta
+    .OrderBy(ordenarPor)
+    .Skip((pagina - 1) * tamanio)
+    .Take(tamanio)
+    .ToListAsync(ct);
+```
+**Tres trampas:**
+- `Skip` cuenta **filas a descartar desde 0**; la API cuenta **páginas desde 1**. De ahí `(pagina - 1) * tamanio`. Con `pagina * tamanio` la página 1 sale vacía (la caza de bugs del 15-oct).
+- Sin `OrderBy`, SQL no garantiza el orden de las filas, y entre una página y otra pueden repetirse o saltarse filas (#180).
+- El orden va **antes** de `Skip`/`Take`. En el SQL, `LIMIT`/`OFFSET` se aplican al resultado ya ordenado.
+
+---
+
+### Ordenar sobre un DTO: *could not be translated*
+
+**Qué es:** si proyectas con `Select(r => new RegataDto(...))` **antes** de `OrderBy`/`Skip`/`Take`, el `OrderBy` ya no se aplica sobre una columna de la tabla, sino sobre una propiedad de un objeto construido con un constructor, y EF Core no sabe traducirlo a SQL. Lanza `InvalidOperationException: The LINQ expression ... could not be translated`, y la API responde 500.
+
+**Equivalente en Java:** en JPQL/Criteria se ordena por la entidad (`ORDER BY r.id`), no por el DTO al que luego se mapea. La proyección a DTO es lo último que se hace.
+
+**Ejemplo real (#175, `GET /api/regatas`):**
+```csharp
+// ❌ 500: OrderBy sobre RegataDto.Id, que no es una columna
+consulta.Select(RegataMapper.ToDtoProjection).OrderBy(d => d.Id).Skip(...).Take(...)
+
+// ✅ ordenar y paginar sobre la entidad, proyectar al final
+consulta.OrderBy(r => r.Id).Skip(...).Take(...).Select(RegataMapper.ToDtoProjection)
+```
+Por eso `PaginarAsync` tiene una sobrecarga `<T, TResultado>` que recibe la proyección y la aplica **después de `Take`**.
+
+**Por qué los tests no lo vieron:** `UseInMemoryDatabase` no traduce a SQL (ver «Lo que no prueba el proveedor InMemory»), así que el mismo `OrderBy` sobre el DTO pasaba en los tests y reventaba contra MySQL. Se detectó a mano en el navegador; lo cubrirá el #177 (Testcontainers).
 
 ---
 
@@ -1109,6 +1201,34 @@ Tres tests con este montaje: un 1062 → `ConflictException`; un `DbUpdateExcept
 
 ---
 
+### Sembrar con un contexto y leer con otro
+
+**Qué es:** si un test inserta los datos y luego consulta con el **mismo** `DbContext`, el *change tracker* ya tiene todas las entidades en memoria y **enlaza solo** sus relaciones (*fixup*). Un `Tripulante.Barco` aparece relleno aunque la consulta no tenga `Include`. El test sale verde por la razón equivocada. Para que pruebe el `Include` de verdad, se siembra con un contexto y se consulta con otro nuevo sobre la misma base InMemory.
+
+**Equivalente en Java:** igual que la caché de primer nivel del `EntityManager`: en el mismo `EntityManager`, `em.find` devuelve la instancia ya cargada y no ejecuta SQL. Se hace `em.clear()` para forzar la lectura.
+
+**Ejemplo real (`TripulanteRepositoryPaginacionTests.cs`, #175):**
+```csharp
+var options = new DbContextOptionsBuilder<MarinaDbContext>()
+    .UseInMemoryDatabase(Guid.NewGuid().ToString())   // base única por test
+    .Options;
+
+using (var siembra = new MarinaDbContext(options))     // contexto 1: solo siembra
+{
+    siembra.Barcos.Add(new Barco { Id = 1, Nombre = "La Bestia", Tipo = "Velero" });
+    siembra.Tripulantes.AddRange(/* ids 3, 1, 2 en desorden */);
+    await siembra.SaveChangesAsync();
+}
+
+using var context = new MarinaDbContext(options);      // contexto 2: nuevo, sin fixup
+var repository = new TripulanteRepository(context);
+var (elementos, total) = await repository.FindPageWithBarcoAsync(1, 2);
+elementos.Should().OnlyContain(t => t.Barco != null && t.Barco.Nombre == "La Bestia");
+```
+**Comprobado en rojo:** sin `.Include(t => t.Barco)` el test falla con `Barco = <null>, BarcoId = 1`; con él, pasa. El nombre único por test evita que unos tests vean los datos de otros.
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM
@@ -1168,6 +1288,11 @@ Errores que ya han salido en el proyecto y que no son de lógica, sino de herram
 | `DirectoryNotFoundException: ...\wwwroot` al arrancar la API | Manifiesto `*.staticwebassets.runtime.json` de **otra rama** (la del frontend, `feature/171-frontend-listados`) en `bin/` y `obj/`. Cambiar de rama no limpia `bin/` | `dotnet clean .\MarinaApi` y volver a arrancar (ha pasado tres veces) |
 | `dotnet ef ...` falla con *Unable to connect to any of the specified MySQL hosts* | `ServerVersion.AutoDetect(...)` en `Program.cs` consulta la versión a MySQL al crear el `DbContext`, también en tiempo de diseño (`migrations add`) | `docker start marina-mysql` antes de cualquier comando `dotnet ef` |
 | `dotnet watch` se para con `Contract.Fail` en `HotReloadMSBuildWorkspace` | Fallo interno de *hot reload* al crear archivos nuevos, no del código propio | Reiniciar `dotnet watch`. Para cambios solo en `wwwroot` basta `dotnet run` + F5 |
+| `InvalidOperationException: ... could not be translated` (500 en un listado paginado) | `OrderBy`/`Skip` aplicados **después** de proyectar a un DTO con constructor | Ordenar y paginar sobre la entidad y proyectar al final (ver «Ordenar sobre un DTO»). InMemory no lo detecta |
+| El JS falla con `tripulantes is not iterable` tras cambiar el JSON de la API | El navegador sigue con el `.js` antiguo en caché (esperaba una lista y ahora llega `{ elementos, ... }`) | `Ctrl+F5` y comprobar que el código lee `respuesta.elementos` |
+| `curl` a `https://localhost:5000` da `SEC_E_INVALID_TOKEN` | El puerto 5000 habla HTTP, no HTTPS; el 5001 solo escucha con el perfil `https` | `curl.exe -i http://localhost:5000/api/...` |
+| `git merge` o `git commit` abre un editor (Vim) con `MERGE_MSG` | Git pide confirmar el mensaje del merge commit | `Esc`, `:wq`, `Enter` (o `git merge --no-edit`) |
+| `git switch` falla con *Your local changes to ... appsettings.Development.json would be overwritten* | El archivo sale modificado solo por el final de línea (CRLF/LF) o por `user-jwts` | `git restore MarinaApi/appsettings.Development.json` si no hay cambios reales; nunca va en un commit |
 
 **Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 
