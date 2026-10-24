@@ -33,18 +33,19 @@
 | **#172** | Asignar un barco a un amarre ocupado desaloja al barco anterior | Bug | 🔴 | 2 | — | ✅ [PR #11](https://github.com/IgorDAM/Proyecto_CSharp/pull/11) |
 | **#173** | El contenedor `marina-mysql` publica el 3306 en toda la red local | Seguridad | 🟠 | 1 | — | ⬜ |
 | **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ✅ [PR #14](https://github.com/IgorDAM/Proyecto_CSharp/pull/14) |
-| **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ⬜ |
+| **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ✅ [PR #20](https://github.com/IgorDAM/Proyecto_CSharp/pull/20) (Barcos) y [PR #22](https://github.com/IgorDAM/Proyecto_CSharp/pull/22) (Amarres, Regatas y Tripulantes) |
 | **#176** | HSTS fuera de Development | Producción | 🟢 | 1 | — | ⬜ |
 | **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
 | **#178** | Mensaje de `NotFoundException` siempre en masculino ("Regata ... no encontrado") | Calidad | 🟢 | 1 | — | ⬜ |
-| **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ⬜ |
+| **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ✅ [PR #21](https://github.com/IgorDAM/Proyecto_CSharp/pull/21) |
+| **#180** | Listados sin `ORDER BY`: el orden de las filas no está garantizado | Bug | 🟢 | 2 | — | ⬜ |
 
-**Total: 57 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179; ya hechos: #154, #156, #159, #168, #171, #172 y #174). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #159, #161, #168, #171, #172, #174, #175 y #179). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
 - **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
-- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175, #176 y #178
+- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 ✅, #176, #178 y #180
 
 ---
 
@@ -278,11 +279,12 @@
 - **Tipo:** Producción · **Puntos:** 3 · **Origen:** revisión de seguridad del 2026-09-30
 - **Problema:** `GET /api/Barcos`, `/api/Amarres`, `/api/Regatas` y `/api/Tripulantes` devuelven la tabla entera con `ToListAsync()`. Con muchos registros, una sola petición carga todo en memoria y en la respuesta.
 - **Criterios de aceptación:**
-  - [ ] Parámetros `?pagina=1&tamanio=20` con `[FromQuery]` y un máximo (p. ej. 100) validado.
-  - [ ] `Skip`/`Take` con un `OrderBy` estable (sin él, el orden de las páginas no está garantizado).
-  - [ ] Respuesta con los elementos y el total (DTO `PaginaDto<T>` o cabecera `X-Total-Count`).
-  - [ ] Tests del repositorio o del servicio para la primera página, la última y una fuera de rango.
+  - [x] Parámetros `?pagina=1&tamanio=20` con `[FromQuery]` y un máximo (p. ej. 100) validado.
+  - [x] `Skip`/`Take` con un `OrderBy` estable (sin él, el orden de las páginas no está garantizado).
+  - [x] Respuesta con los elementos y el total (DTO `PaginaDto<T>` o cabecera `X-Total-Count`).
+  - [x] Tests del repositorio o del servicio para la primera página, la última y una fuera de rango.
 - **Guía:** equivalente a `Pageable`/`Page<T>` de Spring Data.
+- **Avance:** Barcos en [PR #20](https://github.com/IgorDAM/Proyecto_CSharp/pull/20): `PaginaDto<T>`, `FindPageAsync` en el repositorio genérico, `[FromQuery]` con `[Range]` (400 automático) y tres tests en `GenericRepositoryPaginacionTests` (primera página, última incompleta y fuera de rango). Amarres, Regatas y Tripulantes en [PR #22](https://github.com/IgorDAM/Proyecto_CSharp/pull/22): el método de extensión `PaginarAsync` (`Repositories/PaginacionExtensions.cs`) hace `CountAsync` + `OrderBy` → `Skip` → `Take` → `Select`, con una sobrecarga `<T, TResultado>` que proyecta *después* de `Take`; `GenericRepository.FindPageAsync` lo reutiliza. Regatas ordena sobre la entidad y proyecta al final, porque EF Core no traduce un `OrderBy` sobre una propiedad de un DTO construido con `new RegataDto(...)` (dio un 500 que InMemory no habría detectado). Tripulantes pagina con `Include(t => t.Barco)`. Tests: `RegataRepositoryPaginacionTests` y `TripulanteRepositoryPaginacionTests` (el segundo siembra con otro contexto y se comprobó en rojo sin el `Include`). Suite: 49/49. `[AllowAnonymous]` solo en los `GetAll` de Regatas y Tripulantes (los usa el frontend #179).
 
 ### #176 — HSTS fuera de Development
 
@@ -332,11 +334,23 @@
 - **Objetivo de aprendizaje:** el frontend es el medio; el fin es entender cómo se conecta con el backend y qué aporta cada capa (Middleware, Controller, DTO, Service, Repository, DbContext). Se documenta en `ARQUITECTURA_CAPAS.md` ([[Arquitectura por capas]] en el vault).
 - **Decisión:** las páginas viven en `MarinaApi/wwwroot/` y las sirve la propia API, en el mismo origen. No hace falta CORS, así que no condiciona al #168.
 - **Criterios de aceptación:**
-  - [ ] `Program.cs` sirve `wwwroot` (`UseDefaultFiles` + `UseStaticFiles`).
-  - [ ] `index.html` con barra de navegación Bootstrap.
-  - [ ] Listado de Barcos (`GET /api/barcos`) en una tabla.
-  - [ ] Listado de Regatas (`GET /api/regatas`), mostrando `totalBarcosInscritos`.
-  - [ ] Listado de Tripulantes (`GET /api/tripulantes`).
-  - [ ] Mensaje visible si la API falla o la lista viene vacía.
-  - [ ] `ARQUITECTURA_CAPAS.md` con el recorrido completo de una petición y al menos un experimento por capa.
+  - [x] `Program.cs` sirve `wwwroot` (`UseDefaultFiles` + `UseStaticFiles`).
+  - [x] `index.html` con barra de navegación Bootstrap.
+  - [x] Listado de Barcos (`GET /api/barcos`) en una tabla.
+  - [x] Listado de Regatas (`GET /api/regatas`), mostrando `totalBarcosInscritos`.
+  - [x] Listado de Tripulantes (`GET /api/tripulantes`).
+  - [x] Mensaje visible si la API falla o la lista viene vacía.
+  - [x] `ARQUITECTURA_CAPAS.md` con el recorrido completo de una petición y al menos un experimento por capa.
+- **Resultado:** ✅ [PR #21](https://github.com/IgorDAM/Proyecto_CSharp/pull/21). Se llamó #171 en la rama (`feature/171-frontend-listados`) y se renumeró a #179 al chocar con el #171 del `docker-compose.yml` que ya existía en `master`.
+- **Decisión de acceso (2026-10-20):** tras añadirse la `FallbackPolicy` (autenticación JWT) el frontend recibía 401. Se puso `[AllowAnonymous]` solo en los tres `GetAll` que usa (Barcos, Regatas, Tripulantes); `GetById`, `POST`, `PUT` y `DELETE` siguen exigiendo token. Contrapartida asumida: los listados son visibles sin autenticarse. Comprobado con `curl`: `GET /api/barcos/1` → 401, `GET /api/barcos` → 200.
 - **Fuera de alcance:** crear, editar y borrar desde el frontend (ticket aparte si se quiere más adelante).
+
+### #180 — Listados sin `ORDER BY`: el orden de las filas no está garantizado
+
+- **Tipo:** Bug (latente) · **Puntos:** 2 · **Origen:** #179 (2026-10-21)
+- **Problema:** `GET /api/tripulantes` devolvió los tripulantes en el orden 2, 1, 3. `TripulanteRepository.FindAllWithBarcoAsync` hace `Include(t => t.Barco).ToListAsync()` sin `OrderBy`, así que el SQL generado no lleva `ORDER BY` y MySQL puede devolver las filas en el orden que le convenga (con el `JOIN`, recorriendo otro índice). Barcos sí sale ordenado porque `FindPageAsync` lleva `OrderBy`. El mismo hueco está en `GenericRepository.FindAllAsync` (lo usa Amarres) y hay que revisar `RegataService.FindAllAsync` y los finders con `Where` (`FindByTipo`, `FindByLugar`, `FindByBarcoId`...).
+- **Criterios de aceptación:**
+  - [ ] Los `GetAll` ordenan explícitamente por `Id` (en el repositorio). *Ya cubierto para los listados paginados* (#175: `PaginarAsync` siempre lleva `ORDER BY`); queda `GenericRepository.FindAllAsync`, `FindAllWithBarcoAsync` y los demás listados sin paginar.
+  - [ ] Decidir si los finders con `Where` prometen un orden (por `Id`) y dejarlo escrito.
+  - [ ] Un test por listado que inserte las filas en desorden (ids 3, 1, 2) y compruebe que salen 1, 2, 3; sin el `OrderBy` el proveedor InMemory las devuelve en orden de inserción, así que el test se pone en rojo.
+- **Guía:** equivalente en Spring Data: `findAll(Sort.by("id"))`. Relacionado con el #175: paginar exige un orden estable, o las páginas pueden repetir o saltarse filas.
