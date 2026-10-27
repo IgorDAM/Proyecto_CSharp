@@ -38,17 +38,20 @@ public class BarcoRepository : GenericRepository<Barco>, IBarcoRepository
         _context = context;
     }
 
+    // Todos los finders que devuelven listas ordenan por Id (#180): sin ORDER BY,
+    // SQL no garantiza el orden de las filas. Equivale a findByTipoOrderByIdAsc(...)
+    // en Spring Data.
     public async Task<Barco?> FindByNombreAsync(string nombre, CancellationToken ct = default) =>
         await _context.Barcos.FirstOrDefaultAsync(b => b.Nombre == nombre, ct);
 
     public async Task<List<Barco>> FindByTipoAsync(string tipo, CancellationToken ct = default) =>
-        await _context.Barcos.Where(b => b.Tipo == tipo).ToListAsync(ct);
+        await _context.Barcos.Where(b => b.Tipo == tipo).OrderBy(b => b.Id).ToListAsync(ct);
 
     public async Task<List<Barco>> FindByEsloraGreaterThanAsync(int eslora, CancellationToken ct = default) =>
-        await _context.Barcos.Where(b => b.Eslora > eslora).ToListAsync(ct);
+        await _context.Barcos.Where(b => b.Eslora > eslora).OrderBy(b => b.Id).ToListAsync(ct);
 
     public async Task<List<Barco>> FindByCapacidadGreaterThanAsync(int capacidad, CancellationToken ct = default) =>
-        await _context.Barcos.Where(b => b.Capacidad > capacidad).ToListAsync(ct);
+        await _context.Barcos.Where(b => b.Capacidad > capacidad).OrderBy(b => b.Id).ToListAsync(ct);
 
     public async Task<long> CountByTipoAsync(string tipo, CancellationToken ct = default) =>
         await _context.Barcos.LongCountAsync(b => b.Tipo == tipo, ct);
@@ -61,7 +64,7 @@ public class BarcoRepository : GenericRepository<Barco>, IBarcoRepository
             .FirstOrDefaultAsync(b => b.Id == id, ct);
 
     public async Task<List<Barco>> FindSinAmarreAsync(CancellationToken ct = default) =>
-        await _context.Barcos.Where(b => b.Amarre == null).ToListAsync(ct);
+        await _context.Barcos.Where(b => b.Amarre == null).OrderBy(b => b.Id).ToListAsync(ct);
 
     public async Task<double> GetPromedioEsloraByTipoAsync(string tipo, CancellationToken ct = default) =>
         await _context.Barcos
@@ -69,5 +72,5 @@ public class BarcoRepository : GenericRepository<Barco>, IBarcoRepository
             .AverageAsync(b => (double)b.Eslora, ct);
 
     public async Task<List<Barco>> FindByCapacidadGreaterThanOrEqualAsync(int capacidadMinima, CancellationToken ct = default) =>
-await _context.Barcos.Where(b => b.Capacidad >= capacidadMinima).ToListAsync(ct);
+await _context.Barcos.Where(b => b.Capacidad >= capacidadMinima).OrderBy(b => b.Id).ToListAsync(ct);
 }

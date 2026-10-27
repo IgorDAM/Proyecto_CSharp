@@ -50,13 +50,13 @@ public class AmarreRepository : GenericRepository<Amarre>, IAmarreRepository
         await _context.Amarres.FirstOrDefaultAsync(a => a.Ubicacion == ubicacion, ct);
 
     public async Task<List<Amarre>> FindByPrecioLessThanAsync(double precio, CancellationToken ct = default) =>
-        await _context.Amarres.Where(a => a.Precio < precio).ToListAsync(ct);
+        await _context.Amarres.Where(a => a.Precio < precio).OrderBy(a => a.Id).ToListAsync(ct);
 
     public async Task<List<Amarre>> FindByElectricidadAsync(bool electricidad, CancellationToken ct = default) =>
-        await _context.Amarres.Where(a => a.Electricidad == electricidad).ToListAsync(ct);
+        await _context.Amarres.Where(a => a.Electricidad == electricidad).OrderBy(a => a.Id).ToListAsync(ct);
 
     public async Task<List<Amarre>> FindLibresAsync(CancellationToken ct = default) =>
-        await _context.Amarres.Where(a => a.BarcoId == null).ToListAsync(ct);
+        await _context.Amarres.Where(a => a.BarcoId == null).OrderBy(a => a.Id).ToListAsync(ct);
     public async Task<Amarre?> FindByBarcoIdAsync(long barcoId, CancellationToken ct = default) =>
     await _context.Amarres.FirstOrDefaultAsync(a => a.BarcoId == barcoId, ct);
 }
