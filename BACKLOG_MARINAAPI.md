@@ -38,14 +38,14 @@
 | **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
 | **#178** | Mensaje de `NotFoundException` siempre en masculino ("Regata ... no encontrado") | Calidad | 🟢 | 1 | — | ⬜ |
 | **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ✅ [PR #21](https://github.com/IgorDAM/Proyecto_CSharp/pull/21) |
-| **#180** | Listados sin `ORDER BY`: el orden de las filas no está garantizado | Bug | 🟢 | 2 | — | ⬜ |
+| **#180** | Listados sin `ORDER BY`: el orden de las filas no está garantizado | Bug | 🟢 | 2 | — | ✅ [PR #24](https://github.com/IgorDAM/Proyecto_CSharp/pull/24) |
 
-**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #159, #161, #168, #171, #172, #174, #175 y #179). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #159, #161, #168, #171, #172, #174, #175, #179 y #180). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
 - **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
-- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 ✅, #176, #178 y #180
+- **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 ✅, #176, #178 y #180 ✅
 
 ---
 
@@ -345,12 +345,13 @@
 - **Decisión de acceso (2026-10-20):** tras añadirse la `FallbackPolicy` (autenticación JWT) el frontend recibía 401. Se puso `[AllowAnonymous]` solo en los tres `GetAll` que usa (Barcos, Regatas, Tripulantes); `GetById`, `POST`, `PUT` y `DELETE` siguen exigiendo token. Contrapartida asumida: los listados son visibles sin autenticarse. Comprobado con `curl`: `GET /api/barcos/1` → 401, `GET /api/barcos` → 200.
 - **Fuera de alcance:** crear, editar y borrar desde el frontend (ticket aparte si se quiere más adelante).
 
-### #180 — Listados sin `ORDER BY`: el orden de las filas no está garantizado
+### #180 — Listados sin `ORDER BY`: el orden de las filas no está garantizado ✅ [PR #24](https://github.com/IgorDAM/Proyecto_CSharp/pull/24)
 
 - **Tipo:** Bug (latente) · **Puntos:** 2 · **Origen:** #179 (2026-10-21)
 - **Problema:** `GET /api/tripulantes` devolvió los tripulantes en el orden 2, 1, 3. `TripulanteRepository.FindAllWithBarcoAsync` hace `Include(t => t.Barco).ToListAsync()` sin `OrderBy`, así que el SQL generado no lleva `ORDER BY` y MySQL puede devolver las filas en el orden que le convenga (con el `JOIN`, recorriendo otro índice). Barcos sí sale ordenado porque `FindPageAsync` lleva `OrderBy`. El mismo hueco está en `GenericRepository.FindAllAsync` (lo usa Amarres) y hay que revisar `RegataService.FindAllAsync` y los finders con `Where` (`FindByTipo`, `FindByLugar`, `FindByBarcoId`...).
 - **Criterios de aceptación:**
-  - [ ] Los `GetAll` ordenan explícitamente por `Id` (en el repositorio). *Ya cubierto para los listados paginados* (#175: `PaginarAsync` siempre lleva `ORDER BY`); queda `GenericRepository.FindAllAsync`, `FindAllWithBarcoAsync` y los demás listados sin paginar.
-  - [ ] Decidir si los finders con `Where` prometen un orden (por `Id`) y dejarlo escrito.
-  - [ ] Un test por listado que inserte las filas en desorden (ids 3, 1, 2) y compruebe que salen 1, 2, 3; sin el `OrderBy` el proveedor InMemory las devuelve en orden de inserción, así que el test se pone en rojo.
-- **Guía:** equivalente en Spring Data: `findAll(Sort.by("id"))`. Relacionado con el #175: paginar exige un orden estable, o las páginas pueden repetir o saltarse filas.
+  - [x] Los `GetAll` ordenan explícitamente por `Id` (en el repositorio). *Ya cubierto para los listados paginados* (#175: `PaginarAsync` siempre lleva `ORDER BY`); queda `GenericRepository.FindAllAsync`, `FindAllWithBarcoAsync` y los demás listados sin paginar.
+  - [x] Decidir si los finders con `Where` prometen un orden (por `Id`) y dejarlo escrito. *Decidido (2026-10-26): los 12 finders que devuelven listas ordenan por `Id` (Barcos 5, Amarres 3, Regatas 3, Tripulantes 1); los de una sola fila (`FirstOrDefaultAsync`) y los agregados no.*
+  - [x] Un test por listado que inserte las filas en desorden (ids 3, 1, 2) y compruebe que salen 1, 2, 3; sin el `OrderBy` el proveedor InMemory las devuelve en orden de inserción, así que el test se pone en rojo.
+- **Resultado:** ✅ [PR #24](https://github.com/IgorDAM/Proyecto_CSharp/pull/24). `GenericRepository.FindAllAsync` (Barcos y Amarres) ordena con `EF.Property<long>(e, "Id")`; `FindAllWithBarcoAsync` (Tripulantes) y `FindAllConContadorAsync` (Regatas, ordenando sobre la entidad antes del `Select`) también. Cinco clases de test nuevas (`GenericRepositoryOrdenTests`, `BarcoRepositoryOrdenTests`, `AmarreRepositoryOrdenTests`, `RegataRepositoryOrdenTests`, `TripulanteRepositoryOrdenTests`), cada una vista en rojo sin el arreglo. Suite: 57/57.
+- **Guía:** equivalente en Spring Data: `findAll(Sort.by("id"))`. Relacionado con el #175: paginar exige un orden estable, o las páginas pueden repetir o saltarse filas. Glosario: «Sin `ORDER BY` no hay orden garantizado».

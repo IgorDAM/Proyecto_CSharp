@@ -844,6 +844,36 @@ Por eso `PaginarAsync` tiene una sobrecarga `<T, TResultado>` que recibe la proy
 
 ---
 
+### Sin `ORDER BY` no hay orden garantizado (listados, finders y `EF.Property`)
+
+**Qué es:** si una consulta no lleva `ORDER BY`, SQL no promete en qué orden salen las filas: MySQL devuelve las que le convenga (con un `JOIN` puede recorrer otro índice) y el orden puede cambiar entre dos ejecuciones o al añadir un índice. En EF Core, lo que genera el `ORDER BY` es `OrderBy`. Un **finder** es un método de repositorio que busca entidades por un criterio (`FindByTipoAsync`, un `Where`); no es un término de C#, viene de los *finder methods* de Spring Data. No es lo mismo que los métodos `...With...` (`FindByIdWithRegatasAsync`), que solo añaden un `Include`.
+
+**Equivalente en Java:** `findAll(Sort.by("id"))` y `findByTipoOrderByIdAsc(tipo)` en Spring Data; `order by t.id` en JPQL.
+
+**Ejemplo real (#180):**
+```csharp
+// Listado con Include: el OrderBy va antes de ToListAsync
+_context.Tripulantes.Include(t => t.Barco).OrderBy(t => t.Id).ToListAsync(ct);
+
+// Finder: Where → OrderBy → ToListAsync, como en SQL (WHERE ... ORDER BY ...)
+_context.Barcos.Where(b => b.Tipo == tipo).OrderBy(b => b.Id).ToListAsync(ct);
+
+// Con proyección a DTO: ordenar sobre la entidad, antes del Select
+_context.Regatas.Where(r => r.Lugar == lugar).OrderBy(r => r.Id)
+    .Select(RegataMapper.ToDtoProjection).ToListAsync(ct);
+
+// Repositorio genérico: para el compilador T no tiene Id
+_dbSet.OrderBy(e => EF.Property<long>(e, "Id")).ToListAsync(ct);
+```
+**Tres trampas:**
+- Un `OrderBy` **después** de `ToListAsync` ordena en memoria (LINQ to Objects), no en SQL. Va siempre antes.
+- `EF.Property<long>(e, "Id")` usa un `string` que el compilador no revisa, como `Sort.by("id")`: si una entidad no tuviera `Id`, fallaría al ejecutar. Por eso hay un test por entidad (Barco y Amarre).
+- Regla del proyecto (#180): los listados y los finders que devuelven listas ordenan por `Id`; los que devuelven una sola fila (`FirstOrDefaultAsync`) o un número no necesitan orden.
+
+**Cómo se prueba:** se insertan las filas en desorden (3, 1, 2) y se exige 1, 2, 3. InMemory devuelve el orden de inserción, así que sin `OrderBy` el test se pone en rojo (ver «Falso verde»).
+
+---
+
 ## LINQ
 
 ### Func frente a Expression
@@ -1097,6 +1127,7 @@ _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationTo
 - **No soporta transacciones.** `BeginTransactionAsync` lanza un error, salvo que se ignore el aviso `TransactionIgnoredWarning`. Por eso `RegataService.DeleteAsync` se quedó sin test en el #152.
 - **No traduce a SQL.** Una consulta LINQ que MySQL no sabría ejecutar puede pasar en InMemory.
 - **No tiene restricciones de la BD.** No aplica `ON DELETE`, FKs ni índices únicos: solo lo que hace EF en memoria.
+- **No ordena por sí mismo.** Sin `OrderBy` devuelve las filas en orden de inserción, mientras que MySQL puede devolverlas en otro. Para probar el orden hay que sembrar en desorden (#180).
 
 **Equivalente en Java:** H2 en modo memoria en los tests de Spring. Con H2 se ejecuta SQL de verdad, pero en otro dialecto, así que también puede dar falsos verdes. La alternativa seria en los dos mundos es **Testcontainers** con el motor real (MySQL).
 
@@ -1136,6 +1167,8 @@ await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
 **Relacionado (#174):** para afirmar que **no** pasa nada, `.Should().NotThrowAsync()` (`assertDoesNotThrow` en JUnit), y para comprobar el contenido de una colección, `barco.Regatas.Should().ContainSingle(r => r.Id == 2)`: exactamente un elemento y que cumple la condición (`assertThat(lista).singleElement().matches(...)` en AssertJ). Ver [[Guía definitiva de CSharp]] para el resto de aserciones.
 
 **Relacionado (#155, #161):** un verde que no has visto pasar antes por rojo no prueba nada. En el #155 el «verde» eran resultados antiguos del panel de tests (el helper estaba pegado en la clase equivocada y no compilaba, `CS0103`). En el #161 el test positivo `Contenedor_NoTieneDependenciasCautivas` salía verde con `ValidateOnBuild` apagado por un `!` olvidado; solo lo delató el test negativo, que mete a propósito una dependencia cautiva. Comprueba siempre el total de tests (`total: N`) y el resumen final, no solo el color.
+
+**Relacionado (#180, caza de bugs del 26-oct):** un test de orden con las filas sembradas **ya ordenadas** (1, 2, 3) sale verde con y sin `OrderBy`, porque InMemory devuelve el orden de inserción y da igual lo que haga el código. Siembra siempre en desorden (3, 1, 2) y, antes de fiarte, comenta el arreglo (o cámbialo por `OrderByDescending`) y comprueba que el test se pone en rojo.
 
 ---
 
