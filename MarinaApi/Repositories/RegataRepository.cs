@@ -32,18 +32,22 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
         await _context.Regatas.FirstOrDefaultAsync(r => r.Nombre == nombre, ct);
 
     public async Task<List<Regata>> FindByLugarAsync(string lugar, CancellationToken ct = default) =>
-        await _context.Regatas.Where(r => r.Lugar == lugar).ToListAsync(ct);
+        await _context.Regatas.Where(r => r.Lugar == lugar).OrderBy(r => r.Id).ToListAsync(ct);
 
     public async Task<List<Regata>> FindByDistanciaGreaterThanAsync(int distancia, CancellationToken ct = default) =>
-        await _context.Regatas.Where(r => r.Distancia > distancia).ToListAsync(ct);
+        await _context.Regatas.Where(r => r.Distancia > distancia).OrderBy(r => r.Id).ToListAsync(ct);
 
     public async Task<Regata?> FindByIdWithBarcosAsync(long id, CancellationToken ct = default) =>
         await _context.Regatas.Include(r => r.Barcos).FirstOrDefaultAsync(r => r.Id == id, ct);
 
-    public async Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default) =>
-        await _context.Regatas
-            .Select(RegataMapper.ToDtoProjection)
-            .ToListAsync(ct);
+// Se ordena sobre Regata (OrderBy por Id) ANTES de proyectar con Select: EF Core
+// no traduce un OrderBy sobre las propiedades de un DTO construido con "new".
+// Sin ORDER BY, SQL no garantiza el orden de las filas (#180).
+public async Task<List<RegataDto>> FindAllConContadorAsync(CancellationToken ct = default) =>
+    await _context.Regatas
+        .OrderBy(r => r.Id)
+        .Select(RegataMapper.ToDtoProjection)
+        .ToListAsync(ct);
 
     // Misma proyección que FindAllConContadorAsync (cuenta los barcos en SQL, sin N+1),
     // pero paginada. Se ordena y recorta sobre Regata y se proyecta a RegataDto al final:
@@ -56,6 +60,7 @@ public class RegataRepository : GenericRepository<Regata>, IRegataRepository
     public async Task<List<RegataDto>> FindByLugarConContadorAsync(string lugar, CancellationToken ct = default) =>
         await _context.Regatas
             .Where(r => r.Lugar == lugar)
+            .OrderBy(r => r.Id)
             .Select(RegataMapper.ToDtoProjection)
             .ToListAsync(ct);
 

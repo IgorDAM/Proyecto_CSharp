@@ -27,9 +27,14 @@ public class GenericRepository<T> : IGenericRepository<T> where T : class
     public async Task<T?> FindByIdAsync(long id, CancellationToken ct = default) =>
         await _dbSet.FindAsync(new object[] { id }, ct);
 
-    // Equivalente a session.createQuery("from T", T.class).getResultList()
-    public async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
-        await _dbSet.ToListAsync(ct);
+// Equivalente a session.createQuery("from T order by id", T.class).getResultList()
+// o a findAll(Sort.by("id")) de Spring Data. Sin ORDER BY, SQL no garantiza el
+// orden de las filas (#180). T no tiene Id en el compilador, así que se
+// ordena por nombre de propiedad con EF.Property.
+public async Task<List<T>> FindAllAsync(CancellationToken ct = default) =>
+    await _dbSet
+        .OrderBy(e => EF.Property<long>(e, "Id"))
+        .ToListAsync(ct);
 
     // Equivalente a findAll(PageRequest.of(pagina - 1, tamanio, Sort.by("id"))) de
     // Spring Data JPA, que también lanza dos consultas: un COUNT y un SELECT paginado.
