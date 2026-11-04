@@ -34,6 +34,14 @@ public class MarinaDbContext : DbContext
             .HasForeignKey<Amarre>(a => a.BarcoId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // ── Precio de Amarre: dinero exacto con 2 decimales (#157) ──
+        // decimal(10, 2) = hasta 10 dígitos en total, 2 de ellos decimales
+        // (máximo 99.999.999,99). Sin esto, Pomelo usaría decimal(65,30).
+        // En JPA sería @Column(precision = 10, scale = 2).
+        modelBuilder.Entity<Amarre>()
+            .Property(a => a.Precio)
+            .HasPrecision(10, 2);
+
         // ── Relación N:M Barco ↔ Regata ──
         // EF Core 5+ genera la tabla intermedia "BarcoRegata" automáticamente,
         // sin necesidad de una clase Java extra para representarla.

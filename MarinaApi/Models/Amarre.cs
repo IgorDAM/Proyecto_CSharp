@@ -14,7 +14,7 @@ public class Amarre
     [Required, MaxLength(20)]
     public string Ubicacion { get; set; } = string.Empty;
 
-    public double Precio { get; set; }
+    public decimal Precio { get; set; }
 
     public int Profundidad { get; set; }
 

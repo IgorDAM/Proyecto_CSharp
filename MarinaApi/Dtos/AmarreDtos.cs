@@ -3,7 +3,7 @@ namespace MarinaApi.Dtos;
 public record AmarreDto(
     long Id,
     string Ubicacion,
-    double Precio,
+    decimal Precio,
     int Profundidad,
     int Longitud,
     bool Electricidad,
@@ -12,7 +12,7 @@ public record AmarreDto(
 
 public record AmarreRequestDto(
     string Ubicacion,
-    double Precio,
+    decimal Precio,
     int Profundidad,
     int Longitud,
     bool Electricidad

@@ -54,8 +54,9 @@ namespace MarinaApi.Migrations
                     b.Property<int>("Longitud")
                         .HasColumnType("int");
 
-                    b.Property<double>("Precio")
-                        .HasColumnType("double");
+                    b.Property<decimal>("Precio")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("decimal(10,2)");
 
                     b.Property<int>("Profundidad")
                         .HasColumnType("int");
