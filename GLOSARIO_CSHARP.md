@@ -790,6 +790,28 @@ dotnet ef migrations script InitialCreate AmarreSetNullAlBorrarBarco --project .
 
 ---
 
+### `decimal` para dinero: el sufijo `m`, `HasPrecision` y el `AlterColumn`
+
+**Qué es:** `decimal` es el tipo de C# para importes de dinero. Guarda los dígitos en base 10, así que `0.1m + 0.2m` es exactamente `0.3m`; `double` los guarda en binario y `0.1 + 0.2` da `0.30000000000000004`. Tres piezas:
+- **El sufijo `m`:** `0.1m` es un `decimal`; `0.1` a secas es un `double`. C# **no convierte solo** entre `double` y `decimal` (error **CS0266**), porque se perdería precisión. Un entero (`30`) sí se convierte solo a `decimal`.
+- **`HasPrecision(10, 2)`** (Fluent API, en `OnModelCreating`): fija la columna a `decimal(10,2)`, es decir, 10 dígitos en total y 2 decimales (máximo 99.999.999,99). Sin ella, Pomelo usa `decimal(65,30)` y lanza un warning. Alternativa: el atributo `[Precision(10, 2)]` sobre la propiedad.
+- **`AlterColumn` en la migración:** cambiar el tipo de una propiedad genera `AlterColumn<decimal>`, que en MySQL es `ALTER TABLE ... MODIFY COLUMN Precio decimal(10,2) NOT NULL`. MySQL convierte los datos que ya hay (redondea a 2 decimales y falla si un valor no cabe). Es un cambio en el sitio, no `DropColumn` + `AddColumn`: si saliera esto último, parar, porque se perderían los datos.
+
+**Equivalente en Java:** `BigDecimal` con `@Column(precision = 10, scale = 2)`. La diferencia es de uso: `BigDecimal` es una clase (`new BigDecimal("0.1")`, `.add(...)`, `.compareTo(...)`) y `decimal` es un tipo de valor con los operadores normales (`+`, `<`).
+
+**Ejemplo real (#157):**
+```csharp
+// MarinaDbContext.OnModelCreating
+modelBuilder.Entity<Amarre>()
+    .Property(a => a.Precio)
+    .HasPrecision(10, 2);
+```
+El cambio se propagó por el compilador: al pasar `Amarre.Precio` a `decimal` dejaron de compilar el mapper, los dos DTOs y `FindByPrecioLessThanAsync(decimal precio, ...)`. En la interfaz y en la clase la firma debe ser idéntica.
+
+**Cómo se prueba:** sumar `0.1m` y `0.2m` y exigir `0.3m` (`AmarrePrecioDecimalTests`). El rojo es un error de compilación mientras la propiedad sea `double`. La precisión de la columna no la ve InMemory (ver «Lo que no prueba el proveedor InMemory»): se comprueba contra MySQL, a mano en Swagger o con el #177.
+
+---
+
 ### En MySQL el DDL no es transaccional
 
 **Qué es:** en MySQL, cada sentencia DDL (`CREATE`, `ALTER`, `DROP`...) hace un **commit implícito**: no se puede deshacer con un `ROLLBACK`. Si una migración tiene dos `ALTER TABLE` y falla el segundo, el primero ya se ha quedado aplicado, y la migración no consta en `__EFMigrationsHistory`. Hay que arreglarlo a mano.
@@ -1127,6 +1149,7 @@ _amarreRepositoryMock.Setup(r => r.FindByBarcoIdAsync(5, It.IsAny<CancellationTo
 - **No soporta transacciones.** `BeginTransactionAsync` lanza un error, salvo que se ignore el aviso `TransactionIgnoredWarning`. Por eso `RegataService.DeleteAsync` se quedó sin test en el #152.
 - **No traduce a SQL.** Una consulta LINQ que MySQL no sabría ejecutar puede pasar en InMemory.
 - **No tiene restricciones de la BD.** No aplica `ON DELETE`, FKs ni índices únicos: solo lo que hace EF en memoria.
+- **No valida el tipo ni la precisión de la columna.** Con `HasPrecision(10, 2)` guarda el `decimal` tal cual: no redondea a 2 decimales ni rechaza uno demasiado grande. Eso solo lo hace MySQL (#157).
 - **No ordena por sí mismo.** Sin `OrderBy` devuelve las filas en orden de inserción, mientras que MySQL puede devolverlas en otro. Para probar el orden hay que sembrar en desorden (#180).
 
 **Equivalente en Java:** H2 en modo memoria en los tests de Spring. Con H2 se ejecuta SQL de verdad, pero en otro dialecto, así que también puede dar falsos verdes. La alternativa seria en los dos mundos es **Testcontainers** con el motor real (MySQL).
@@ -1326,6 +1349,7 @@ Errores que ya han salido en el proyecto y que no son de lógica, sino de herram
 | `curl` a `https://localhost:5000` da `SEC_E_INVALID_TOKEN` | El puerto 5000 habla HTTP, no HTTPS; el 5001 solo escucha con el perfil `https` | `curl.exe -i http://localhost:5000/api/...` |
 | `git merge` o `git commit` abre un editor (Vim) con `MERGE_MSG` | Git pide confirmar el mensaje del merge commit | `Esc`, `:wq`, `Enter` (o `git merge --no-edit`) |
 | `git switch` falla con *Your local changes to ... appsettings.Development.json would be overwritten* | El archivo sale modificado solo por el final de línea (CRLF/LF) o por `user-jwts` | `git restore MarinaApi/appsettings.Development.json` si no hay cambios reales; nunca va en un commit |
+| **CS0266** / **CS0019**: *Cannot implicitly convert type 'decimal' to 'double'* (o al revés), u *Operator '<' cannot be applied to operands of type 'decimal' and 'double'* | C# no convierte solo entre `decimal` y `double` porque se perdería precisión. Suele salir en cadena al cambiar el tipo de una propiedad: entidad, DTOs, mapper y repositorios dejan de compilar a la vez | Cambiar el tipo en todos los sitios que lista el compilador (o, si de verdad lo quieres, un cast explícito `(decimal)x`). Un literal `decimal` lleva el sufijo `m` (`0.1m`) |
 
 **Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 

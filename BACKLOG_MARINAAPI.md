@@ -15,7 +15,7 @@
 | **#154** | Borrar un Barco elimina también su Amarre | Bug | 🔴 | 2 | — | ✅ [PR #12](https://github.com/IgorDAM/Proyecto_CSharp/pull/12) |
 | **#155** | Asignación concurrente de barco devuelve 500 en vez de 409 | Bug | 🔴 | 2 | — | ✅ [PR #17](https://github.com/IgorDAM/Proyecto_CSharp/pull/17) |
 | **#156** | Credenciales de MySQL versionadas en `appsettings.json` | Seguridad | 🔴 | 2 | #171 | ✅ [PR #10](https://github.com/IgorDAM/Proyecto_CSharp/pull/10) |
-| **#157** | `Precio` de Amarre como `double` en vez de `decimal` | Bug | 🔴 | 3 | — | ⬜ |
+| **#157** | `Precio` de Amarre como `double` en vez de `decimal` | Bug | 🔴 | 3 | — | ✅ [PR #26](https://github.com/IgorDAM/Proyecto_CSharp/pull/26) |
 | **#158** | Unit of Work: los repositorios no deben llamar a `SaveChangesAsync` | Deuda técnica | 🟠 | 5 | — | ⬜ |
 | **#159** | Completar y versionar los tests de `AssignBarcoAsync` | Tests | 🟠 | 2 | — | ✅ [PR #2] |
 | **#160** | Sustituir `FluentValidation.AspNetCore` y añadir validadores | Deuda técnica | 🟠 | 3 | — | ⬜ |
@@ -40,10 +40,10 @@
 | **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ✅ [PR #21](https://github.com/IgorDAM/Proyecto_CSharp/pull/21) |
 | **#180** | Listados sin `ORDER BY`: el orden de las filas no está garantizado | Bug | 🟢 | 2 | — | ✅ [PR #24](https://github.com/IgorDAM/Proyecto_CSharp/pull/24) |
 
-**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #159, #161, #168, #171, #172, #174, #175, #179 y #180). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #157, #159, #161, #168, #171, #172, #174, #175, #179 y #180). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
-- **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
+- **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157 ✅, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
 - **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
 - **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 ✅, #176, #178 y #180 ✅
 
@@ -108,14 +108,17 @@
 - **Verificado en Swagger contra MySQL (2026-10-01):** asignación normal 200 → misma asignación 200 → otro barco 409 (`El Amarre con Id 1 ya está ocupado por el Barco 1.`) → el amarre conserva su barco. Tests 37/37.
 - **Guía:** Lección 12.2 (invariantes de dominio). Encaja después en #165 (`Amarre.AsignarBarco()`).
 
-### #157 — `Precio` de Amarre como `double` en vez de `decimal`
+### #157 — `Precio` de Amarre como `double` en vez de `decimal` ✅ [PR #26](https://github.com/IgorDAM/Proyecto_CSharp/pull/26)
 
 - **Tipo:** Bug · **Puntos:** 3
 - **Problema:** `Amarre.Precio`, `AmarreDto` y `AmarreRequestDto` usan `double`. Para importes de dinero, `double` produce errores de redondeo (`0.1 + 0.2 != 0.3`). La guía lo explica desde la Lección 1: el tipo correcto en C# es `decimal`, el equivalente nativo de `BigDecimal`.
 - **Criterios de aceptación:**
-  - [ ] `decimal` en entidad y DTOs, con `HasPrecision(10, 2)` (o `[Precision(10, 2)]`).
-  - [ ] Migración revisada: el `ALTER COLUMN` de `float` a `decimal(10,2)` conserva los datos existentes.
-  - [ ] Tests existentes adaptados.
+  - [x] `decimal` en entidad y DTOs, con `HasPrecision(10, 2)` (o `[Precision(10, 2)]`). También en el parámetro de `FindByPrecioLessThanAsync`.
+  - [x] Migración revisada: el `ALTER COLUMN` de `double` a `decimal(10,2)` conserva los datos existentes. (El backlog decía `float`, que es la columna de SQL Server; en MySQL con Pomelo era `double`.)
+  - [x] Tests existentes adaptados: compilan sin cambios (el literal entero `30` se convierte solo a `decimal`). Test nuevo `AmarrePrecioDecimalTests`.
+- **Verificado (2026-11-04):** test visto en rojo (CS0266, no compila con `double`) y en verde; suite 58/58. Migración `PrecioAmarreDecimal` revisada con `dotnet ef migrations script` y aplicada en MySQL: los precios previos (350 y 100) quedaron como `350.00` y `100.00`. Desde Swagger, `POST` y `GET` de precios `0.1` y `0.2` devuelven los valores exactos.
+- **Fuera de alcance:** `Eslora` sigue en `double` (no es dinero). La comprobación de la precisión contra MySQL real queda para el #177 (Testcontainers).
+- **Glosario:** «`decimal` para dinero: el sufijo `m`, `HasPrecision` y el `AlterColumn`».
 - **Guía:** Lección 1.2 (tipos), Lección 12.2 (value object `Dinero`).
 
 ---
