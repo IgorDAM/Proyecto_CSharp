@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using MarinaApi.Data;
 using MarinaApi.Middleware;
 using MarinaApi.Repositories;
 using MarinaApi.Services;
-
+using Microsoft.OpenApi;
 var builder = WebApplication.CreateBuilder(args);
 
 // Validación del contenedor de DI fuera de producción: detecta dependencias
@@ -98,15 +98,11 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT",
         Description = "Pega el token de `dotnet user-jwts create` (sin el prefijo 'Bearer')."
     });
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    // El requisito ya no se construye con un OpenApiReference a mano: recibe el
+    // documento y apunta al esquema "Bearer" con OpenApiSecuritySchemeReference.
+    options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
-            },
-            Array.Empty<string>()
-        }
+        [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
 });
 
