@@ -94,13 +94,15 @@ Mantenemos exactamente el mismo dominio que tu tutorial Java, para que puedas co
 ## 2.1. El equivalente al `pom.xml`: `.csproj`
 
 ```xml
-<!-- Ver archivo del proyecto: MarinaApi.csproj (actualizado 2026-09-22, migración a MySQL — ver 2.6) -->
+<!-- Ver archivo del proyecto: MarinaApi.csproj (actualizado 2026-11-10, subida a .NET 10 — ver 2.7) -->
+<PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+</PropertyGroup>
 <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.13" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.13" /> <!-- ya no se usa, pendiente de quitar -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.13" />
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.3" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.13" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13" />
+    <PackageReference Include="Microting.EntityFrameworkCore.MySql" Version="10.0.13" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.3.1" />
 </ItemGroup>
 ```
 
@@ -129,7 +131,7 @@ spring.datasource.username=root
 spring.datasource.password=root
 ```
 
-> **Nota (actualizada 2026-09-22):** el proyecto empezó con **SQL Server** para practicar EF Core con un motor distinto al del tutorial Java. El 2026-09-22 se migró a **MySQL** (con Pomelo), que es lo que se usa en SEIDEL — ver el detalle completo en la sección 2.6. `Program.cs` usa ahora `UseMySql(...)`. Si en documentación antigua o en internet ves `UseSqlServer(...)`, es el proveedor que este proyecto tenía antes de esa fecha.
+> **Nota (actualizada 2026-09-22):** el proyecto empezó con **SQL Server** para practicar EF Core con un motor distinto al del tutorial Java. El 2026-09-22 se migró a **MySQL** (con Pomelo; desde la subida a .NET 10, con su fork Microting — ver 2.7), que es lo que se usa en SEIDEL — ver el detalle completo en la sección 2.6. `Program.cs` usa ahora `UseMySql(...)`. Si en documentación antigua o en internet ves `UseSqlServer(...)`, es el proveedor que este proyecto tenía antes de esa fecha.
 
 ## 2.3. `Program.cs`: el equivalente a la autoconfiguración de Spring Boot
 
@@ -260,7 +262,7 @@ BarcoRegata  ← Tabla intermedia N:M (generada automáticamente por EF Core)
 
 ## 2.6. Migración de SQL Server a MySQL (2026-09-22)
 
-El proyecto empezó en SQL Server para practicar EF Core con un motor distinto al de tu tutorial Java. El 2026-09-22 se migró a MySQL (con Pomelo.EntityFrameworkCore.MySql), alineándolo con el stack real de SEIDEL. Cambiar de proveedor en EF Core toca cuatro sitios:
+El proyecto empezó en SQL Server para practicar EF Core con un motor distinto al de tu tutorial Java. El 2026-09-22 se migró a MySQL (con Pomelo.EntityFrameworkCore.MySql; desde el 2026-11-09 el paquete es su fork Microting, ver 2.7), alineándolo con el stack real de SEIDEL. Cambiar de proveedor en EF Core toca cuatro sitios:
 
 **1. El paquete NuGet.** `Microsoft.EntityFrameworkCore.SqlServer` → `Pomelo.EntityFrameworkCore.MySql` (no hay proveedor MySQL oficial de Microsoft; Pomelo es el estándar de facto, como `mysql-connector-j` frente a `mssql-jdbc` en Java/Maven).
 
@@ -298,6 +300,42 @@ docker run --name marina-mysql -e MYSQL_ROOT_PASSWORD=<TU_PASSWORD> -e MYSQL_DAT
 ```
 
 - **Checkpoint:** cambiar de proveedor EF Core no es solo "cambiar una línea" — toca el paquete, la configuración, el código de arranque y obliga a regenerar el historial de migraciones. Pero el modelo, los repositorios, los servicios y los controllers no cambian ni una línea: esa es la promesa de EF Core (y de cualquier ORM) como capa de abstracción sobre el motor de base de datos concreto.
+
+## 2.7. Subida a .NET 10 (2026-11-09)
+
+.NET 8 (y .NET 9) dejan de tener soporte el **10 de noviembre de 2026**, y las prácticas en SEIDEL empiezan en marzo de 2027, así que MarinaApi pasó de `net8.0` a `net10.0` (SDK 10.0.301) en la rama `chore/net10` (PR #28). El orden que se siguió, compilando tras cada paso:
+
+1. **`TargetFramework`:** `net8.0` → `net10.0` en `MarinaApi.csproj` y en `MarinaApi.Tests.csproj`. Con solo esto el proyecto ya compila, aunque los paquetes sigan en 8.x.
+2. **EF Core:** `Microsoft.EntityFrameworkCore` y `Microsoft.EntityFrameworkCore.Design` a 10.0.13. Los paquetes de EF Core deben llevar todos la misma versión mayor.
+3. **Resto de paquetes de Microsoft:** `Microsoft.AspNetCore.Authentication.JwtBearer`, `Microsoft.AspNetCore.Mvc.Testing` y `Microsoft.EntityFrameworkCore.InMemory`, también a 10.0.13.
+4. **Swashbuckle:** 6.6.2 → 10.3.1, que arrastra `Microsoft.OpenApi` 2.x y obliga a cambiar el código de Swagger (más abajo).
+5. **Proveedor MySQL:** `Pomelo.EntityFrameworkCore.MySql` → `Microting.EntityFrameworkCore.MySql` (más abajo).
+
+> **Equivalente en Java:** es como subir `maven.compiler.release` (o `<java.version>`) y la versión de Spring Boot. La diferencia: Spring Boot trae un BOM (`spring-boot-dependencies`) que alinea las versiones de todas las librerías. En NuGet **no hay BOM**: alinear las versiones de EF Core con la del framework lo haces tú, `PackageReference` a `PackageReference`.
+
+**El proveedor de MySQL.** Pomelo no tiene versión para EF Core 10 (la última es la 9.0.0 y exige EF Core 9.x). Las opciones eran quedarse en EF Core 9 con Pomelo 9.0.0 (EF Core 9 acaba su soporte el mismo día que .NET 8), usar el proveedor de Oracle, o el fork `Microting.EntityFrameworkCore.MySql` 10.0.x, que es el que se eligió. El código no cambió: `UseMySql(cadena, ServerVersion.AutoDetect(cadena))` es el mismo, y como el proyecto no tenía ningún `using Pomelo...`, bastó cambiar el **nombre** del paquete en el `.csproj` (no solo el número de versión: Pomelo 10.x no existe y NuGet falla con NU1102).
+
+**Swagger con Swashbuckle 10.** `Microsoft.OpenApi` 2.x ya no construye la referencia al esquema `Bearer` con un `OpenApiReference` a mano. Ahora `AddSecurityRequirement` recibe el documento y se apunta al esquema por su nombre con `OpenApiSecuritySchemeReference`:
+
+```csharp
+// Program.cs
+using Microsoft.OpenApi;   // en la 2.x ya no existe Microsoft.OpenApi.Models
+
+options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+{
+    [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+});
+```
+
+Tres detalles de sintaxis: la lambda `document => ...` es la que recibe el documento OpenAPI; el inicializador de diccionario `[clave] = valor` es el mismo que ya viste con `Dictionary`; y `[]` es una *collection expression* (C# 12) que aquí hace de lista vacía de *scopes* (un esquema Bearer no tiene). En springdoc es `@SecurityRequirement(name = "Bearer")`: también se referencia por nombre.
+
+**Qué no cambió.** Las migraciones: `dotnet ef migrations has-pending-model-changes` no detectó cambios y `dotnet ef database update` no tenía nada pendiente. El `ModelSnapshot` sigue con `ProductVersion 8.0.13`; se reescribirá con la versión nueva al generar la próxima migración. Verificación de la subida: `dotnet test` 58/58, la API arranca en Development con `ValidateOnBuild`, `GET /api/Barcos` con JWT devuelve 200 y `swagger.json` conserva el esquema `Bearer`.
+
+> **Pendiente de comprobar:** una migración generada con EF Core 8 (como la del #181, guardada en un stash) conviene revisarla con `dotnet ef migrations has-pending-model-changes` antes de aplicarla en la rama nueva.
+
+Los errores concretos que salieron durante la subida (NU1102, MSB3027, CS0105, Swagger UI en blanco) están en la tabla «Errores frecuentes» de [[Glosario CSharp]].
+
+- **Checkpoint:** subir de versión de .NET no es solo cambiar `TargetFramework`: hay que alinear los paquetes de EF Core, revisar los que dependen de un proveedor de terceros (el de MySQL) y comprobar con `build`, `test` y una prueba real contra la base. El soporte de una versión tiene fecha: mirarla antes de que venza, no después.
 
 ---
 

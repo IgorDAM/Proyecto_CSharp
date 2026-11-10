@@ -1,6 +1,6 @@
 # Marina API — Puerto a CSharp / ASP.NET Core
 
-Conversión completa a C#/.NET 8 del proyecto Java (Hibernate → Spring Boot →
+Conversión completa a C#/.NET 10 del proyecto Java (Hibernate → Spring Boot →
 API REST) de gestión marítima y regatas. Mismo dominio (Barco, Amarre, Regata),
 misma arquitectura por capas, pero con mejoras aplicadas allí donde el
 ecosistema .NET lo permite de forma más limpia.
@@ -11,8 +11,8 @@ Stack de SEIDEL frente a este proyecto:
 
 | | Tutorial Java original | Este proyecto | SEIDEL |
 |---|---|---|---|
-| Lenguaje / framework | Java / Spring Boot | **C# / ASP.NET Core (.NET 8)** | .NET / C# |
-| Base de datos | MySQL | **MySQL 8 (Pomelo)** | MySQL y PostgreSQL |
+| Lenguaje / framework | Java / Spring Boot | **C# / ASP.NET Core (.NET 10)** | .NET / C# |
+| Base de datos | MySQL | **MySQL 8 (Microting, fork de Pomelo)** | MySQL y PostgreSQL |
 | ORM | Hibernate | **Entity Framework Core** | — |
 | Integraciones | — | REST | Incluye sistemas legacy SOAP/XML |
 | Despliegue | — | Local (Docker) | Azure y AWS |
