@@ -88,7 +88,7 @@ Para no cargar el diagrama se omiten otros middlewares del pipeline (`UseDefault
 
 ### 2.6 DbContext + EF Core — del objeto al SQL
 
-- **Qué hace:** traduce LINQ a SQL del motor concreto (Pomelo para MySQL), abre la conexión, materializa las filas en objetos y registra cambios para `SaveChangesAsync`.
+- **Qué hace:** traduce LINQ a SQL del motor concreto (el proveedor `Microting.EntityFrameworkCore.MySql` para MySQL, fork de Pomelo), abre la conexión, materializa las filas en objetos y registra cambios para `SaveChangesAsync`.
 - **Equivalente en Spring:** `EntityManager` / Hibernate con su dialecto.
 - **Sin él:** SQL escrito a mano y mapeo de columnas a propiedades uno a uno (ADO.NET, el JDBC de .NET).
 

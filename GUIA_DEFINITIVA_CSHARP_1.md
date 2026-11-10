@@ -2216,7 +2216,7 @@ EF Core (Lección 8) cubre la mayoría de los casos, pero en proyectos reales co
 | Motor | Driver ADO.NET | Proveedor EF Core |
 |---|---|---|
 | PostgreSQL | `Npgsql` | `Npgsql.EntityFrameworkCore.PostgreSQL` |
-| MySQL | `MySqlConnector` (recomendado) o `MySql.Data` (de Oracle) | `Pomelo.EntityFrameworkCore.MySql` (usa MySqlConnector) |
+| MySQL | `MySqlConnector` (recomendado) o `MySql.Data` (de Oracle) | `Pomelo.EntityFrameworkCore.MySql` (usa MySqlConnector); en .NET 10, su fork `Microting.EntityFrameworkCore.MySql` |
 | SQL Server | `Microsoft.Data.SqlClient` | `Microsoft.EntityFrameworkCore.SqlServer` |
 | Oracle | `Oracle.ManagedDataAccess.Core` | `Oracle.EntityFrameworkCore` |
 
@@ -2329,7 +2329,7 @@ await _db.Database.ExecuteSqlAsync($"CALL sp_desactivar_cliente({idCliente})", c
 | `FULL OUTER JOIN` | No (se emula con `UNION`) | Sí | Sí | Sí |
 | DDL dentro de transacción | No (commit implícito) | Sí | Sí | No (commit implícito) |
 | Driver .NET | `MySqlConnector` | `Npgsql` | `Microsoft.Data.SqlClient` | `Oracle.ManagedDataAccess.Core` |
-| Proveedor EF Core | `Pomelo.EntityFrameworkCore.MySql` | `Npgsql.EntityFrameworkCore.PostgreSQL` | `Microsoft.EntityFrameworkCore.SqlServer` | `Oracle.EntityFrameworkCore` |
+| Proveedor EF Core | `Pomelo.EntityFrameworkCore.MySql` (en .NET 10: `Microting.EntityFrameworkCore.MySql`) | `Npgsql.EntityFrameworkCore.PostgreSQL` | `Microsoft.EntityFrameworkCore.SqlServer` | `Oracle.EntityFrameworkCore` |
 | Servicio gestionado en la nube | Azure Database for MySQL, Amazon RDS / Aurora MySQL | Azure Database for PostgreSQL, Amazon RDS / Aurora PostgreSQL | Azure SQL Database, Amazon RDS for SQL Server | Amazon RDS for Oracle |
 
 > 💡 **Tip:** la última fila importa para SEIDEL, que despliega en Azure y AWS: en la práctica, sus bases de datos MySQL y PostgreSQL pueden estar en servicios gestionados como estos. Para tu código cambia poco (una cadena de conexión con SSL obligatorio). Lo que sí cambia es que **no tienes acceso al servidor**: ni a sus archivos ni a su configuración. Los ajustes se hacen desde el portal o con parámetros del servicio.
@@ -2389,6 +2389,7 @@ El paquete del proveedor depende del motor. Los ejemplos de esta lección usan S
 ```bash
 dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL      # PostgreSQL → options.UseNpgsql(cadena)
 dotnet add package Pomelo.EntityFrameworkCore.MySql           # MySQL      → options.UseMySql(cadena, ServerVersion.AutoDetect(cadena))
+# En .NET 10 (Pomelo aún no tiene versión para EF Core 10): dotnet add package Microting.EntityFrameworkCore.MySql   (mismo UseMySql)
 ```
 
 Todo lo demás de esta lección (DbContext, consultas LINQ, migraciones) es igual para cualquier proveedor. Las diferencias que sí importan están en la [[#Lección 7: SQL — MySQL, PostgreSQL y SQL Server|Lección 7]] y en la [[#11.4 Interfaces en Domain, implementación en Infrastructure|Lección 11.4]].
@@ -3719,7 +3720,7 @@ services.AddDbContext<MarinaDbContext>(o =>
     {
         "SqlServer"  => o.UseSqlServer(cadena),                                  // Microsoft.EntityFrameworkCore.SqlServer
         "PostgreSQL" => o.UseNpgsql(cadena),                                     // Npgsql.EntityFrameworkCore.PostgreSQL
-        "MySQL"      => o.UseMySql(cadena, ServerVersion.AutoDetect(cadena)),    // Pomelo.EntityFrameworkCore.MySql
+        "MySQL"      => o.UseMySql(cadena, ServerVersion.AutoDetect(cadena)),    // Pomelo.EntityFrameworkCore.MySql (en .NET 10: Microting.EntityFrameworkCore.MySql)
         _ => throw new InvalidOperationException($"Proveedor de BD no soportado: {proveedor}")
     };
 });

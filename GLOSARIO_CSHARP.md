@@ -629,6 +629,47 @@ Hace falta `using System.ComponentModel.DataAnnotations;`. El máximo de 100 evi
 
 ---
 
+### Subir de versión de .NET (`TargetFramework` y paquetes)
+
+**Qué es:** pasar el proyecto de un .NET con fecha de fin de soporte (el 8 vence el 10-nov-2026) a otro vigente (`net10.0`). Se hace en este orden, compilando tras cada paso: `TargetFramework` en cada `.csproj` → paquetes de EF Core (todos a la misma versión mayor) → resto de paquetes de Microsoft → paquetes de terceros → `dotnet test` → prueba real contra la base. Después, `dotnet ef migrations has-pending-model-changes` debe decir que no hay cambios, y conviene actualizar la herramienta global con `dotnet tool update --global dotnet-ef`.
+
+**Equivalente en Java:** subir `maven.compiler.release` y la versión de Spring Boot. Diferencia: Spring Boot alinea las librerías con su BOM; en NuGet no hay BOM y las versiones las alineas tú.
+
+**Ejemplo:**
+```xml
+<!-- MarinaApi.csproj -->
+<TargetFramework>net10.0</TargetFramework>
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.13" />
+```
+
+Detalle de la subida de MarinaApi en `MIGRACION_JAVA_A_CSHARP.md`, sección 2.7.
+
+---
+
+### Proveedor MySQL: Pomelo frente a Microting
+
+**Qué es:** el paquete NuGet que traduce LINQ a SQL de MySQL. `Pomelo.EntityFrameworkCore.MySql` no tiene versión para EF Core 10 (su última, la 9.0.0, exige EF Core 9.x), así que MarinaApi usa su fork `Microting.EntityFrameworkCore.MySql` 10.0.x. El código no cambia (`UseMySql(cadena, ServerVersion.AutoDetect(cadena))`); solo el nombre del paquete en el `.csproj`. Si cambias el número de versión pero dejas el nombre antiguo, NuGet da **NU1102**.
+
+**Equivalente en Java:** cambiar el artefacto del driver o del dialecto en el `pom.xml` manteniendo la misma API de JPA: el código de las entidades y los repositorios no se entera.
+
+---
+
+### `OpenApiSecuritySchemeReference` (Swashbuckle 10 y Microsoft.OpenApi 2.x)
+
+**Qué es:** la clase con la que `AddSecurityRequirement` apunta al esquema de seguridad `Bearer` declarado antes con `AddSecurityDefinition`. En Swashbuckle 6 se construía un `OpenApiReference` a mano; en la 10 el método recibe el documento y se referencia el esquema por su nombre. Hace falta `using Microsoft.OpenApi;` (ya no existe `Microsoft.OpenApi.Models`).
+
+**Equivalente en Java:** `@SecurityRequirement(name = "Bearer")` de springdoc, que también apunta al esquema por su nombre.
+
+**Ejemplo:**
+```csharp
+options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+{
+    [new OpenApiSecuritySchemeReference("Bearer", document)] = []   // [] = sin scopes
+});
+```
+
+---
+
 ## Entity Framework Core
 
 ### Proyección a DTO con Select
@@ -1350,6 +1391,10 @@ Errores que ya han salido en el proyecto y que no son de lógica, sino de herram
 | `git merge` o `git commit` abre un editor (Vim) con `MERGE_MSG` | Git pide confirmar el mensaje del merge commit | `Esc`, `:wq`, `Enter` (o `git merge --no-edit`) |
 | `git switch` falla con *Your local changes to ... appsettings.Development.json would be overwritten* | El archivo sale modificado solo por el final de línea (CRLF/LF) o por `user-jwts` | `git restore MarinaApi/appsettings.Development.json` si no hay cambios reales; nunca va en un commit |
 | **CS0266** / **CS0019**: *Cannot implicitly convert type 'decimal' to 'double'* (o al revés), u *Operator '<' cannot be applied to operands of type 'decimal' and 'double'* | C# no convierte solo entre `decimal` y `double` porque se perdería precisión. Suele salir en cadena al cambiar el tipo de una propiedad: entidad, DTOs, mapper y repositorios dejan de compilar a la vez | Cambiar el tipo en todos los sitios que lista el compilador (o, si de verdad lo quieres, un cast explícito `(decimal)x`). Un literal `decimal` lleva el sufijo `m` (`0.1m`) |
+| **NU1102**: *Unable to find package X with version (>= N)* tras subir de versión | Se cambió el número de versión pero el paquete antiguo no tiene esa versión (p. ej. `Pomelo.EntityFrameworkCore.MySql` 10.x no existe) | Cambiar el **nombre** del paquete en el `.csproj` (aquí, `Microting.EntityFrameworkCore.MySql`), no solo `Version` |
+| **CS0105**: *The using directive for 'X' appeared previously in this namespace* | Un `using` repetido (salió al añadir `using Microsoft.OpenApi;` en `Program.cs`) | Quitar el duplicado; es un aviso, no impide compilar |
+| Swagger UI muestra *Unable to render this definition* aunque `/swagger/v1/swagger.json` es válido | Caché del navegador con la página antigua | Recarga forzada (Ctrl+F5) |
+| `docker compose up -d` choca con el contenedor `marina-mysql` que ya existe y crea un volumen vacío nuevo | El contenedor se creó a mano con `docker run`, no con Compose | No usar Compose para esto: `docker start marina-mysql` y seguir con el contenedor existente |
 
 **Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 

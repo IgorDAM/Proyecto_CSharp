@@ -1,7 +1,7 @@
 # Guía de CI/CD
 
 Guía práctica de integración y despliegue continuos aplicada a MarinaApi
-(ASP.NET Core 8) con GitHub Actions. Se apoya en `GUIA_GIT.md`.
+(ASP.NET Core 10) con GitHub Actions. Se apoya en `GUIA_GIT.md`.
 
 > Las rutas de proyecto y nombres de este documento (`MarinaApi/MarinaApi.csproj`,
 > nombre de la solución) ya están adaptados a la estructura real del repo. La
@@ -121,7 +121,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Restaurar dependencias
         run: dotnet restore
@@ -136,7 +136,7 @@ jobs:
 ### Por qué cada paso
 
 - `checkout`: el runner arranca vacío; esto descarga tu código.
-- `setup-dotnet`: instala el SDK que pides. Fijar `8.0.x` hace el build
+- `setup-dotnet`: instala el SDK que pides. Fijar `10.0.x` hace el build
   reproducible.
 - `restore`: descarga los paquetes NuGet (equivale a la resolución de
   dependencias de Maven).
@@ -172,7 +172,7 @@ Se añaden dos jobs al mismo `ci.yml` (dentro de `jobs:`, al nivel de
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Publicar
         run: dotnet publish MarinaApi/MarinaApi.csproj --configuration Release --output ./publish
@@ -311,13 +311,13 @@ del plan y conviene revisar la documentación vigente cuando se aborde.
 
 ```dockerfile
 # Etapa 1: compilar con el SDK (imagen grande)
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY . .
 RUN dotnet publish MarinaApi/MarinaApi.csproj -c Release -o /app
 
 # Etapa 2: ejecutar solo con el runtime (imagen pequeña)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
 ENTRYPOINT ["dotnet", "MarinaApi.dll"]

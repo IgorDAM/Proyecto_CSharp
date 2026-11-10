@@ -1,6 +1,6 @@
 # MarinaApi: documentación del repositorio
 
-Este repositorio contiene **MarinaApi**, una Web API en ASP.NET Core 8 con EF Core, MySQL y tests con xUnit + Moq. Es un port a C# de un proyecto Java con Spring Boot e Hibernate, y se usa como campo de entrenamiento de C#/.NET.
+Este repositorio contiene **MarinaApi**, una Web API en ASP.NET Core 10 con EF Core, MySQL y tests con xUnit + Moq. Es un port a C# de un proyecto Java con Spring Boot e Hibernate, y se usa como campo de entrenamiento de C#/.NET.
 
 Este archivo es el mapa: dice qué hay en cada documento y cuándo se actualiza. Para arrancar la API, mira `MarinaApi/README.md`.
 
