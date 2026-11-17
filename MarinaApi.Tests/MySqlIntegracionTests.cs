@@ -6,7 +6,8 @@ using MySqlConnector;
 
 namespace MarinaApi.Tests;
 
-public class MySqlIntegracionTests : IClassFixture<MySqlFixture>
+[Collection("MySql")]
+public class MySqlIntegracionTests
 {
     private readonly MySqlFixture _mysql;
 
