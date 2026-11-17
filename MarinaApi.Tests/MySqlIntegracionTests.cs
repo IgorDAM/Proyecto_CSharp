@@ -2,6 +2,7 @@ using FluentAssertions;
 using MarinaApi.Models;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using MySqlConnector;
 
 namespace MarinaApi.Tests;
 
@@ -74,5 +75,39 @@ public class MySqlIntegracionTests : IClassFixture<MySqlFixture>
         var amarreLibre = await lectura.Amarres.SingleAsync(a => a.Id == amarreId);
 
         amarreLibre.BarcoId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AsignarElMismoBarcoADosAmarres_ViolaElIndiceUnicoEnMySql()
+    {
+        // Arrange: un barco ya asignado al amarre UQ-1, y un segundo amarre
+        // UQ-2 libre. Ubicaciones con prefijo propio ("UQ-") por el contenedor compartido.
+        long amarreLibreId;
+        long barcoId;
+
+        using (var siembra = _mysql.CrearContexto())
+        {
+            var barco = new Barco { Nombre = "El Albatros", Tipo = "Velero", Eslora = 9, Manga = 3, Capacidad = 5 };
+            var ocupado = new Amarre { Ubicacion = "UQ-1", Precio = 100m, Profundidad = 3, Longitud = 12, Electricidad = true, Barco = barco };
+            var libre = new Amarre { Ubicacion = "UQ-2", Precio = 100m, Profundidad = 3, Longitud = 12, Electricidad = true };
+
+            siembra.Amarres.AddRange(ocupado, libre);
+            await siembra.SaveChangesAsync();
+
+            barcoId = barco.Id;
+            amarreLibreId = libre.Id;
+        }
+        // Act: con un contexto nuevo, asignar al amarre libre el barco que ya
+        // tiene el UQ-1. Nada se ejecuta todavía: guardamos la acción en una variable.
+        using var contexto = _mysql.CrearContexto();
+        var amarre = await contexto.Amarres.SingleAsync(a => a.Id == amarreLibreId);
+        amarre.BarcoId = barcoId;
+
+        var guardar = () => contexto.SaveChangesAsync();
+
+        // Assert: la excepción de EF envuelve la de MySQL, y el 1062 es "Duplicate entry"
+        var excepcion = await guardar.Should().ThrowAsync<DbUpdateException>();
+        excepcion.Which.InnerException.Should().BeOfType<MySqlException>()
+            .Which.Number.Should().Be(1062);
     }
 }
