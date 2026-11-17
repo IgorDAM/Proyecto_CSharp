@@ -20,6 +20,7 @@ public class MySqlFixture : IAsyncLifetime
 
         return new MarinaDbContext(options);
     }
+    
     /// <summary>
     /// Arranca el contenedor MySQL y le aplica todas las migraciones del proyecto,
     /// de modo que cada test encuentra el esquema real (no uno deducido del modelo).
@@ -29,8 +30,7 @@ public class MySqlFixture : IAsyncLifetime
     {
         await _contenedor.StartAsync();
 
-        // Contexto de usar y tirar: solo sirve para a
-        // plicar las migraciones.
+        // Contexto de usar y tirar: solo sirve para aplicar las migraciones.
         using var contexto = CrearContexto();
         await contexto.Database.MigrateAsync();
     }
