@@ -6,7 +6,7 @@ using MarinaApi.Data;
 using MarinaApi.Middleware;
 using MarinaApi.Repositories;
 using MarinaApi.Services;
-using Microsoft.OpenApi;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Validación del contenedor de DI fuera de producción: detecta dependencias
