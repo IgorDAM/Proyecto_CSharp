@@ -334,6 +334,22 @@ El `(double)` evita la división entera: `5 / 2` en `int` es `2`, no `2,5`, y `C
 
 ---
 
+### Inicializador de colección: `Barcos = { a, b }`
+
+**Qué es:** dentro de un inicializador de objeto, `Propiedad = { x, y }` (sin `new`) **no asigna una lista nueva**: llama a `Add` sobre la colección que la propiedad ya tiene, una vez por elemento. Por eso la propiedad tiene que estar inicializada de antemano; si fuera `null`, lanzaría `NullReferenceException`. En `Regata` lo está: `public List<Barco> Barcos { get; set; } = new();`.
+
+**Equivalente en Java:** no hay un literal así. Lo más cercano es `regata.getBarcos().addAll(List.of(barcoA, barcoB))` justo después del `new`. Tampoco es lo mismo que `Barcos = new List<Barco> { a, b }`, que **sí** asigna una lista nueva y descarta la que había.
+
+**Ejemplo real (`MySqlRegataPaginacionTests.cs`, #177):**
+```csharp
+new Regata { Nombre = "PAG-1", /* ... */ Barcos = { barcoA, barcoB } },   // dos barcos inscritos
+new Regata { Nombre = "PAG-2", /* ... */ },                               // ninguno
+new Regata { Nombre = "PAG-3", /* ... */ Barcos = { barcoC } }            // uno
+```
+Al hacer `AddRange` + `SaveChangesAsync`, EF Core descubre los barcos recorriendo la navegación, los inserta también y rellena la tabla intermedia `BarcoRegata`: no hace falta añadirlos al `DbContext` uno a uno.
+
+---
+
 ## .NET / ASP.NET Core
 
 ### Scoped
@@ -808,6 +824,7 @@ modelBuilder.Entity<Amarre>()
     .OnDelete(DeleteBehavior.SetNull);       // antes era Cascade: borrar un barco borraba su amarre
 ```
 El bug del #154 venía de pensar en JPA ("cascada desde Barco hacia Amarre = `CascadeType.ALL`"). En EF Core, `Cascade` borra **el lado que tiene la FK**, que aquí era el amarre: justo el que tenía que sobrevivir. Tabla corregida en [[Migración de Java a CSharp#4.4. Cascade — misma idea, sintaxis distinta]].
+**Cómo se comprueba que la regla es de la BD y no de EF (#177):** si el dependiente está **cargado** (*tracked*) cuando se borra el principal, es EF Core quien le pone `BarcoId = null` con un `UPDATE` antes del `DELETE`, y la regla `ON DELETE` de la base de datos ni se ejecuta. Un test que haga `.Include(b => b.Amarre)` antes de `Remove(barco)` sale en verde **con cualquier regla**, incluso con la FK alterada a `NO ACTION` (ver «Falso verde»). Para probar la FK de verdad: siembra con un contexto, **borra con otro nuevo y sin `Include`**, y lee con un tercero. Así el amarre no está en memoria y solo MySQL puede dejarlo con `BarcoId = null`. Con la FK en `NO ACTION`, ese test se pone rojo con el error 1451 (*Cannot delete or update a parent row*).
 
 ---
 
@@ -828,6 +845,26 @@ El bug del #154 venía de pensar en JPA ("cascada desde Barco hacia Amarre = `Ca
 dotnet ef migrations script InitialCreate AmarreSetNullAlBorrarBarco --project .\MarinaApi
 ```
 **Por qué revisar `Up()`:** si renombras una propiedad, EF Core a veces genera `DropColumn` + `AddColumn` en lugar de `RenameColumn`, y esa columna pierde los datos sin ningún aviso.
+
+---
+
+### `Database.MigrateAsync()` frente a `EnsureCreatedAsync()`: probar el esquema real
+
+**Qué es:** las dos crean la base de datos, pero de forma distinta.
+- **`EnsureCreatedAsync()`** deduce las tablas del **modelo** actual (`DbContext` + `OnModelCreating`) y no usa las migraciones. Si la base ya existe, no hace nada.
+- **`MigrateAsync()`** ejecuta, en orden, las **migraciones** pendientes (los archivos de `Migrations/`). Es lo que hace el despliegue real, así que el esquema resultante es el de producción.
+
+**Equivalente en Java:** `spring.jpa.hibernate.ddl-auto=create` (el esquema sale de las entidades) frente a Flyway o Liquibase (el esquema sale de los scripts de migración). En los tests con Testcontainers se suele preferir lo segundo por la misma razón.
+
+**Por qué se usa `MigrateAsync` en los tests del #177:** si el modelo dice `HasMaxLength(100)` pero la migración no llegó a escribir `varchar(100)`, un test que parta de `EnsureCreated` saldría en verde con un esquema que producción no tiene. Con `MigrateAsync` el test prueba también las migraciones, no solo el modelo. Y como arranca el contenedor desde cero, también detecta una migración que no se pueda aplicar sobre una base vacía.
+
+**Ejemplo real (`MySqlFixture.cs`):**
+```csharp
+await _contenedor.StartAsync();
+
+using var contexto = CrearContexto();   // de usar y tirar: solo aplica las migraciones
+await contexto.Database.MigrateAsync();
+```
 
 ---
 
@@ -934,6 +971,31 @@ _dbSet.OrderBy(e => EF.Property<long>(e, "Id")).ToListAsync(ct);
 - Regla del proyecto (#180): los listados y los finders que devuelven listas ordenan por `Id`; los que devuelven una sola fila (`FirstOrDefaultAsync`) o un número no necesitan orden.
 
 **Cómo se prueba:** se insertan las filas en desorden (3, 1, 2) y se exige 1, 2, 3. InMemory devuelve el orden de inserción, así que sin `OrderBy` el test se pone en rojo (ver «Falso verde»).
+**Contra MySQL real, el test de orden no se puede poner en rojo (#177):** InnoDB guarda las filas ordenadas por la **clave primaria** y un `SELECT` sin `ORDER BY` las lee por ese índice, así que devuelve las filas por `Id` aunque nadie se lo pida. Quitar el `OrderBy` no hace fallar un test de orden contra MySQL, justo al revés que con InMemory. Eso no significa que el orden esté garantizado (un `JOIN`, otro índice o el optimizador pueden cambiarlo, como pasó con los Tripulantes en el #180): significa que **el test que lo defiende es el de InMemory**, sembrado en desorden. Lo que sí ejerce MySQL es la consulta completa. Por eso el test del #177 es el de paginación de Regatas (`ORDER BY` + `Skip`/`Take` + `COUNT` de barcos en SQL), que sí se pone rojo si se rompe el `Skip`.
+
+---
+
+### `SingleAsync`, `SingleOrDefaultAsync`, `FirstAsync` y `FirstOrDefaultAsync`
+
+**Qué es:** cuatro formas de pedir **una** fila. Dos ejes: ¿qué pasa si no hay ninguna? y ¿qué pasa si hay más de una?
+
+| Método | Si no hay filas | Si hay más de una |
+|---|---|---|
+| `SingleAsync` | lanza `InvalidOperationException` | lanza `InvalidOperationException` |
+| `SingleOrDefaultAsync` | devuelve `null` | lanza `InvalidOperationException` |
+| `FirstAsync` | lanza `InvalidOperationException` | devuelve la primera |
+| `FirstOrDefaultAsync` | devuelve `null` | devuelve la primera |
+
+**Equivalente en Java:** `Optional<T> findById(...)` devuelve `Optional.empty()` si no hay fila (como los `...OrDefault`); `getReferenceById(...)` o `.orElseThrow()` lanzan (como los que no llevan `OrDefault`). Spring Data lanza `IncorrectResultSizeDataAccessException` si una consulta que debía dar una fila da varias, igual que `Single`.
+
+**Cuál usar:** `Single` cuando es una **invariante** (en un test: «sembré exactamente una fila con este Id»): si se rompe, el test o el código fallan en voz alta. `SingleOrDefault`/`FirstOrDefault` cuando que no exista es un caso normal que se gestiona (en el Service: `?? throw new NotFoundException(...)`). `First` solo cuando hay varias a propósito y se quiere la primera, y con `OrderBy` delante: sin él, «la primera» no está definida (ver «Sin `ORDER BY` no hay orden garantizado»).
+
+**Ejemplo real (`MySqlIntegracionTests.cs`, #177):**
+```csharp
+var amarreLibre = await lectura.Amarres.SingleAsync(a => a.Id == amarreId);   // tiene que existir
+amarreLibre.BarcoId.Should().BeNull();
+```
+Si el `ON DELETE` hubiera borrado el amarre, `SingleAsync` lanzaría y el test se pondría rojo con una excepción, no con un `null`. Para que el test dijera «el amarre ya no existe», habría que usar `SingleOrDefaultAsync` y `.Should().BeNull()`.
 
 ---
 
@@ -1068,8 +1130,11 @@ Más detalle en [[Migración de Java a CSharp#8.5. Mock Tests en profundidad]].
 | `lista.Should().BeEmpty()` | `isEmpty()` | vacía |
 | `lista.Should().OnlyContain(t => t.BarcoNombre == "Aurora")` | `allMatch(...)` | todos cumplen |
 | `dto.Should().BeEquivalentTo(esperado)` | `usingRecursiveComparison().isEqualTo(...)` | compara propiedad a propiedad |
+| `lista.Select(r => r.Nombre).Should().Equal("A", "B")` | `containsExactly("A", "B")` | mismos elementos **en el mismo orden** |
+| `lista.Should().BeEquivalentTo(esperada)` | `containsExactlyInAnyOrderElementsOf(esperada)` | mismos elementos, **sin importar el orden** (y propiedad a propiedad si son objetos) |
 
 **Por qué se usa en vez de `Assert.Equal` de xUnit:** el mensaje de error dice qué expresión falló y con qué valor. `Assert.Equal(5, resultado.BarcoId)` falla con `Expected: 5, Actual: 7`; `resultado.BarcoId.Should().Be(5)` falla con `Expected resultado.BarcoId to be 5, but found 7`.
+**`Equal` frente a `BeEquivalentTo` en colecciones (#177):** `Equal` exige el orden, y por eso es el que hay que usar para comprobar un `ORDER BY` o una página: `primera.Elementos.Select(r => r.Nombre).Should().Equal("PAG-1", "PAG-2")`. `BeEquivalentTo` ignora el orden por defecto, así que con un test de orden **saldría verde aunque el orden estuviera mal**. Proyectar antes con `Select` (solo el campo que importa) evita comparar objetos enteros con navegaciones.
 
 **Ojo con la versión:** desde la v8 (enero de 2025), FluentAssertions es de pago para uso comercial. El proyecto usa la 6.12, que sigue siendo gratuita. En una empresa conviene preguntar qué versión o alternativa usan (por ejemplo, Shouldly, o los `Assert` de xUnit).
 
@@ -1114,6 +1179,17 @@ await FluentActions.Awaiting(() => _service.AssignBarcoAsync(1, dto))
 ```
 
 **Alternativa sin FluentAssertions (xUnit puro):** `await Assert.ThrowsAsync<ConflictException>(() => _service.AssignBarcoAsync(1, dto));`. Ojo: esta exige el tipo **exacto**, no acepta clases hijas.
+**Guardar la acción en una variable y leer la excepción (`Func<Task>`, `.Which`):** cuando se quiere ver también la excepción interna, se separa el *Act* del *Assert*:
+```csharp
+// Act: nada se ejecuta todavía; la variable es un delegado (Func<Task<int>>)
+var guardar = () => contexto.SaveChangesAsync();
+
+// Assert: ThrowAsync ejecuta, espera y devuelve la excepción capturada
+var excepcion = await guardar.Should().ThrowAsync<DbUpdateException>();
+excepcion.Which.InnerException.Should().BeOfType<MySqlException>()
+    .Which.Number.Should().Be(1062);   // 1062 = Duplicate entry (índice único)
+```
+`.Which` da acceso al objeto ya comprobado para seguir encadenando asserts sobre él. Es el equivalente de `assertThatThrownBy(...).hasCauseInstanceOf(...)` en AssertJ. La excepción de EF (`DbUpdateException`) envuelve la del driver (`MySqlException`, en `InnerException`): el código de error está en la interna. Sigue haciendo falta el `await` (ver la trampa de arriba).
 
 **Ejemplo real (`AssignBarcoServiceTests.cs`, #172):**
 ```csharp
@@ -1233,6 +1309,11 @@ await FluentActions.Awaiting(() => _service.DesinscribirBarcoAsync(1, 999))
 **Relacionado (#155, #161):** un verde que no has visto pasar antes por rojo no prueba nada. En el #155 el «verde» eran resultados antiguos del panel de tests (el helper estaba pegado en la clase equivocada y no compilaba, `CS0103`). En el #161 el test positivo `Contenedor_NoTieneDependenciasCautivas` salía verde con `ValidateOnBuild` apagado por un `!` olvidado; solo lo delató el test negativo, que mete a propósito una dependencia cautiva. Comprueba siempre el total de tests (`total: N`) y el resumen final, no solo el color.
 
 **Relacionado (#180, caza de bugs del 26-oct):** un test de orden con las filas sembradas **ya ordenadas** (1, 2, 3) sale verde con y sin `OrderBy`, porque InMemory devuelve el orden de inserción y da igual lo que haga el código. Siembra siempre en desorden (3, 1, 2) y, antes de fiarte, comenta el arreglo (o cámbialo por `OrderByDescending`) y comprueba que el test se pone en rojo.
+**Relacionado (#177, cazas del 10 y el 19-nov):** dos falsos verdes de integración con MySQL.
+- **El `Include` que hace de `ON DELETE`:** `.Include(b => b.Amarre)` antes de `Remove(barco)` hace que EF ponga `BarcoId = null` por su cuenta y el test no ejerza la FK de la base de datos. Síntoma: el test sigue en verde con la FK alterada a `NO ACTION`, pero borrar un barco con amarre en Workbench da el error 1451 (ver «OnDelete y DeleteBehavior»).
+- **El `await` olvidado:** `guardar.Should().ThrowAsync<DbUpdateException>()` sin `await` crea el `Task` con el assert y nadie lo espera, así que el test no puede fallar. Síntoma: cambias el dato a uno válido y el test, que debería ponerse rojo, sigue en verde. La pista estaba en la compilación (**CS4014** o **CS1998**), como avisa «`FluentActions.Awaiting(...)` y `.Should().ThrowAsync<T>()`».
+
+En los dos casos, el remedio es el mismo que siempre: haz que el test falle a propósito (cambia la FK, pon un dato válido) y comprueba que se pone en rojo **por la razón que esperas**.
 
 ---
 
@@ -1326,6 +1407,53 @@ elementos.Should().OnlyContain(t => t.Barco != null && t.Barco.Nombre == "La Bes
 
 ---
 
+### `IAsyncLifetime`, `ICollectionFixture` y Testcontainers: un MySQL real para los tests
+
+**Qué es:** tres piezas que se combinan en `MarinaApi.Tests` para ejecutar tests contra un MySQL de verdad que se crea y se destruye solo.
+- **Testcontainers** (`Testcontainers.MySql`): una librería que arranca un contenedor Docker desde el propio test (`new MySqlBuilder("mysql:8.0").Build()` + `StartAsync()`) y da su cadena de conexión con un puerto aleatorio. No usa el contenedor `marina-mysql` del desarrollo. Necesita **Docker arrancado**. Un contenedor auxiliar de la librería (Ryuk) lo borra aunque el proceso de tests muera.
+- **`IAsyncLifetime`** (xUnit): una clase con `InitializeAsync()` y `DisposeAsync()`. xUnit espera a que `InitializeAsync` termine antes de ejecutar ningún test, y llama a `DisposeAsync` al final. Es el sitio para el trabajo asíncrono de arranque (arrancar el contenedor, aplicar migraciones): un constructor no puede hacer `await`.
+- **Fixture**: la clase compartida (`MySqlFixture`) que los tests reciben **inyectada en el constructor**. Con `IClassFixture<T>` hay una instancia por clase de tests; con `ICollectionFixture<T>` hay **una para todas las clases de una colección**.
+
+**Equivalente en Java:** `@Testcontainers` + `@Container MySQLContainer`. Un `@Container` estático se comparte entre los tests de una clase; para compartirlo entre clases se usa el patrón del contenedor *singleton* (arrancarlo en un bloque `static`). `IAsyncLifetime` es el `@BeforeAll`/`@AfterAll`, con la diferencia de que en xUnit la fixture es un **objeto inyectado**, no métodos estáticos de la clase de tests.
+
+**Por qué colección y no `IClassFixture` (#177):** MySQL tarda ~38 s en arrancar. Con `IClassFixture`, cada clase de tests arrancaría su propio contenedor (se midió ~50 s por ejecución con una sola clase). Con una colección se arranca **uno** para todas.
+
+**Cómo se monta (tres archivos):**
+```csharp
+// MySqlFixture.cs: arranca el contenedor y aplica las migraciones
+public class MySqlFixture : IAsyncLifetime
+{
+    private readonly MySqlContainer _contenedor = new MySqlBuilder("mysql:8.0").Build();
+    public string CadenaConexion => _contenedor.GetConnectionString();
+    public MarinaDbContext CrearContexto() { /* UseMySql(CadenaConexion, ...) */ }
+    public async Task InitializeAsync() { await _contenedor.StartAsync(); /* MigrateAsync */ }
+    public Task DisposeAsync() => _contenedor.DisposeAsync().AsTask();
+}
+
+// MySqlCollection.cs: declara la colección "MySql" y su fixture
+[CollectionDefinition("MySql")]
+public class MySqlCollection : ICollectionFixture<MySqlFixture> { }
+
+// En cada clase de tests: se apunta a la colección y se pide la fixture por constructor
+[Collection("MySql")]
+public class MySqlRestriccionesTests
+{
+    private readonly MySqlFixture _mysql;
+    public MySqlRestriccionesTests(MySqlFixture mysql) { _mysql = mysql; }
+}
+```
+
+**Tres consecuencias de compartir el contenedor:**
+1. **Los datos se comparten.** Cada test siembra con un **prefijo propio** en sus textos (`SUMA-`, `UQ-`, `PAG-`) y filtra por él, para no mezclarse con los de otros tests.
+2. **Las clases de una misma colección no se ejecutan en paralelo** entre sí (xUnit las serializa). Es lo que evita que dos tests se pisen en la misma base.
+3. **Sin Docker, fallan.** Si Docker no está arrancado, los tests de integración dan error en pocos segundos (el 23-nov: 4 fallos en 14 s, antes de que arrancara ningún contenedor). El resto de la suite funciona.
+
+**Para forzar el esquema en un experimento** (por ejemplo, alterar la FK a `NO ACTION` y comprobar que el test se pone en rojo): `await contexto.Database.ExecuteSqlRawAsync("ALTER TABLE ...")`. Solo para probar un test, nunca en el código del proyecto, y con SQL que no lleve datos del usuario concatenados.
+
+**Ver también:** «`Database.MigrateAsync()` frente a `EnsureCreatedAsync()`», «Lo que no prueba el proveedor InMemory» y «Sembrar con un contexto y leer con otro».
+
+---
+
 ## Git / Azure DevOps
 
 ### LGTM
@@ -1395,6 +1523,7 @@ Errores que ya han salido en el proyecto y que no son de lógica, sino de herram
 | **CS0105**: *The using directive for 'X' appeared previously in this namespace* | Un `using` repetido (salió al añadir `using Microsoft.OpenApi;` en `Program.cs`) | Quitar el duplicado; es un aviso, no impide compilar |
 | Swagger UI muestra *Unable to render this definition* aunque `/swagger/v1/swagger.json` es válido | Caché del navegador con la página antigua | Recarga forzada (Ctrl+F5) |
 | `docker compose up -d` choca con el contenedor `marina-mysql` que ya existe y crea un volumen vacío nuevo | El contenedor se creó a mano con `docker run`, no con Compose | No usar Compose para esto: `docker start marina-mysql` y seguir con el contenedor existente |
+| `InvalidOperationException: A second operation was started on this context instance before a previous operation completed` | Dos consultas sobre el **mismo** `DbContext` a la vez (`Task.WhenAll(...)` o una consulta sin `await` mientras se lanza otra). El `DbContext` **no es seguro entre hilos**: es una unidad de trabajo, no un *pool* | Un `await` por consulta, en secuencia. Si de verdad hacen falta consultas en paralelo, un `DbContext` por consulta (en los tests: `_mysql.CrearContexto()` por cada una) |
 
 **Equivalente en Java:** el MSB3027 es el mismo bloqueo de archivos de Windows que hace fallar `mvn clean` con la aplicación arrancada. El problema de `bin/` y `obj/` equivale a un `target/` viejo, que se arregla con `mvn clean`.
 

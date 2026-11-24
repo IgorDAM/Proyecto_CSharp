@@ -35,16 +35,16 @@
 | **#174** | `DesinscribirBarcoAsync` responde 204 aunque la regata no exista | Bug | 🟢 | 1 | — | ✅ [PR #14](https://github.com/IgorDAM/Proyecto_CSharp/pull/14) |
 | **#175** | Paginación en los listados `GET` | Producción | 🟢 | 3 | — | ✅ [PR #20](https://github.com/IgorDAM/Proyecto_CSharp/pull/20) (Barcos) y [PR #22](https://github.com/IgorDAM/Proyecto_CSharp/pull/22) (Amarres, Regatas y Tripulantes) |
 | **#176** | HSTS fuera de Development | Producción | 🟢 | 1 | — | ⬜ |
-| **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ⬜ |
+| **#177** | Tests de integración contra MySQL real (Testcontainers) | Calidad | 🟠 | 3 | — | ✅ PRs [#30](https://github.com/IgorDAM/Proyecto_CSharp/pull/30), [#31](https://github.com/IgorDAM/Proyecto_CSharp/pull/31), [#32](https://github.com/IgorDAM/Proyecto_CSharp/pull/32), [#33](https://github.com/IgorDAM/Proyecto_CSharp/pull/33) y [#34](https://github.com/IgorDAM/Proyecto_CSharp/pull/34) |
 | **#178** | Mensaje de `NotFoundException` siempre en masculino ("Regata ... no encontrado") | Calidad | 🟢 | 1 | — | ⬜ |
 | **#179** | Frontend simple de solo lectura (HTML + Bootstrap + JS) | Feature | 🟢 | 3 | — | ✅ [PR #21](https://github.com/IgorDAM/Proyecto_CSharp/pull/21) |
 | **#180** | Listados sin `ORDER BY`: el orden de las filas no está garantizado | Bug | 🟢 | 2 | — | ✅ [PR #24](https://github.com/IgorDAM/Proyecto_CSharp/pull/24) |
 
-**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #157, #159, #161, #168, #171, #172, #174, #175, #179 y #180). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
+**Total: 59 puntos** (42 iniciales + 8 de la revisión de seguridad del 2026-09-30 + 3 del #177 + 1 del #178 + 3 del #179 + 2 del #180; ya hechos: #154, #155, #156, #157, #159, #161, #168, #171, #172, #174, #175, #177, #179 y #180). El #179 (frontend) va aparte del reparto de abajo: se trabaja en paralelo, fuera de los tres sprints de mejora. Con una velocidad similar a la del sprint simulado (17 puntos), son unos **tres sprints**.
 
 **Propuesta de reparto:**
 - **Sprint 1 (bugs y riesgos, 16 pts):** #154 ✅, #155 ✅, #156 ✅, #157 ✅, #159 ✅, #161 ✅, #162, #171 ✅ — más #172 ✅, #173 y #174 ✅ de la revisión de seguridad
-- **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177
+- **Sprint 2 (deuda técnica, 16 pts):** #158, #160, #163, #164 — más #177 ✅
 - **Sprint 3 (dominio y producción, 13 pts):** #165, #166, #167, #168 ✅, #169, #170 — más #175 ✅, #176, #178 y #180 ✅
 
 ---
@@ -213,16 +213,16 @@
   - [ ] Borrado el contenedor `marina-sqlserver` (parado desde el 2026-09-30) y su volumen, si ya no hace falta.
 - **Guía:** sección 2.6 de `MIGRACION_JAVA_A_CSHARP.md`.
 
-### #177 — Tests de integración contra MySQL real (Testcontainers)
+### #177 — Tests de integración contra MySQL real (Testcontainers) ✅ PRs #30-#34
 
 - **Tipo:** Calidad · **Puntos:** 3 · **Origen:** #154 (2026-10-05)
 - **Problema:** todos los tests usan Moq o el proveedor InMemory, que no ejecuta SQL ni aplica restricciones de la base de datos (`ON DELETE`, FKs, índices únicos) ni transacciones. Un test del #154 con InMemory saldría en verde aunque la FK siguiera en `Cascade`. Lo mismo pasa con el #155 (índice único → error 1062).
 - **Criterios de aceptación:**
-  - [ ] Proyecto o carpeta de tests de integración con `WebApplicationFactory<Program>` y `Testcontainers.MySql` (MySQL 8.0 en Docker, creado y destruido por los tests).
-  - [ ] Migraciones aplicadas al contenedor con `Database.MigrateAsync()` (prueba también las migraciones, no solo el modelo).
-  - [ ] Autenticación resuelta para los tests (esquema de prueba o token generado), sin desactivar la `FallbackPolicy` en producción.
-  - [ ] Primer test: crear barco con amarre → `DELETE /api/Barcos/{id}` → el amarre sigue con `barcoId = null` (criterio pendiente del #154).
-  - [ ] `dotnet test` sigue funcionando sin Docker para los unit tests (los de integración, separados o con `[Trait]`).
+  - [x] Tests de integración con `Testcontainers.MySql` (MySQL 8.0 en Docker, creado y destruido por los tests), en `MarinaApi.Tests` (`MySqlFixture` + `[Collection]` compartida: un solo contenedor para todas las clases). **Desviación:** sin `WebApplicationFactory<Program>`; los tests usan el `DbContext` directamente contra el contenedor, porque lo que no veía InMemory era el SQL y las restricciones, no el pipeline HTTP.
+  - [x] Migraciones aplicadas al contenedor con `Database.MigrateAsync()` (prueba también las migraciones, no solo el modelo).
+  - [x] ~~Autenticación resuelta para los tests~~ → no aplica: al no pasar por HTTP no hay `FallbackPolicy` de por medio.
+  - [x] Primer test: crear barco con amarre → borrar el barco → el amarre sigue con `barcoId = null` (criterio pendiente del #154). Hecho a nivel de `DbContext`, sin `Include` para que la regla `ON DELETE SET NULL` la aplique la base de datos y no EF. Además: índice único de `Amarres.BarcoId` (error 1062, criterio del #155), `MaxLength` de `Barco.Nombre` y paginación de Regatas con contador en SQL.
+  - [ ] `dotnet test` sigue funcionando sin Docker para los unit tests (los de integración, separados o con `[Trait]`). **Sin hacer:** sin Docker arrancado fallan los tests de integración (el 23-nov dieron 4 fallos en 14 s). Pendiente decidir si se separan con `[Trait]` o se deja así.
 - **Guía:** equivalente a `@SpringBootTest` + `@Testcontainers` + `@Container MySQLContainer` en Spring.
 
 ## 🟢 Prioridad baja
